@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Caixa e Estoque v9.0 (Scanner Real)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- NOVO: Biblioteca para o scanner de código de barras -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-color: #4f46e5; /* indigo-600 */
+            background-color: #eef2ff; /* indigo-50 */
+            color: #4338ca; /* indigo-700 */
+            font-weight: 600;
+        }
+        .tab-button:disabled {
+            color: #9ca3af;
+            border-color: transparent;
+            cursor: not-allowed;
+        }
+        .low-stock-row {
+            background-color: #fef2f2; /* red-50 */
+        }
+        .low-stock-text {
+            color: #b91c1c; /* red-700 */
+            font-weight: bold;
+        }
+        /* Estilo para o leitor de QR Code */
+        #reader {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen text-gray-800">
+
+    <div class="flex flex-col h-full bg-white">
+        <header class="bg-gray-800 p-6 flex-shrink-0">
+            <h1 class="text-2xl sm:text-3xl font-bold text-white">Sistema Integrado de Gestão</h1>
+            <p class="text-gray-300 mt-1">PDV | Estoque | Caixa | Clientes | Relatórios</p>
+        </header>
+
+        <!-- Abas de Navegação -->
+        <div class="border-b border-gray-200 flex-shrink-0">
+            <nav class="flex -mb-px px-4 space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs">
+                <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button active text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
+                    Gestão de Caixa
+                </button>
+                <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg" disabled>
+                    Frente de Caixa (PDV)
+                </button>
+                <button onclick="changeTab('inventory')" id="tab-inventory" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
+                    Estoque
+                </button>
+                <button onclick="changeTab('customers')" id="tab-customers" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
+                    Clientes
+                </button>
+                <button onclick="changeTab('reports')" id="tab-reports" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
+                    Relatórios
+                </button>
+            </nav>
+        </div>
+
+        <!-- Conteúdo Principal Rolável -->
+        <main class="flex-grow overflow-y-auto">
+            <div class="p-4 sm:p-6 md:p-8">
+                <div id="content-cash-register" class="tab-content"></div>
+                <div id="content-pdv" class="tab-content hidden"></div>
+                <div id="content-inventory" class="tab-content hidden"></div>
+                <div id="content-customers" class="tab-content hidden"></div>
+                <div id="content-reports" class="tab-content hidden"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE PAGAMENTO -->
+    <div id="payment-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all scale-95">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Finalizar Venda</h3>
+                <button onclick="closePaymentModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-lg">Resumo da Compra</h4>
+                    <div id="payment-modal-cart-summary" class="text-sm max-h-40 overflow-y-auto pr-2 border-b pb-2"></div>
+                    <div class="text-right">
+                        <p class="text-gray-600">Total a Pagar</p>
+                        <p id="payment-modal-total" class="text-3xl font-bold text-indigo-600"></p>
+                    </div>
+                    <div>
+                        <label for="payment-modal-customer-select" class="block text-sm font-medium text-gray-700">Associar Cliente (opcional)</label>
+                        <select id="payment-modal-customer-select" class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm"></select>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg space-y-4">
+                    <h4 class="font-semibold text-lg">Pagamento</h4>
+                    <form id="add-payment-form" class="flex items-end gap-2">
+                        <div class="flex-grow">
+                            <label for="payment-method" class="block text-sm font-medium">Forma</label>
+                            <select id="payment-method" class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm">
+                                <option>Dinheiro</option>
+                                <option>Cartão de Crédito</option>
+                                <option>Cartão de Débito</option>
+                                <option>Pix</option>
+                            </select>
+                        </div>
+                        <div class="flex-grow">
+                             <label for="payment-amount" class="block text-sm font-medium">Valor</label>
+                            <input type="number" id="payment-amount" step="0.01" min="0.01" required class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <button type="submit" class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 h-10">Add</button>
+                    </form>
+                    <div id="payment-modal-payments-list" class="text-sm space-y-1"></div>
+                    <div class="border-t pt-2 space-y-1 text-right">
+                        <p class="text-gray-600">Valor Pago: <span id="payment-modal-paid-amount" class="font-bold">R$ 0,00</span></p>
+                        <p class="text-gray-600">Troco: <span id="payment-modal-change" class="font-bold">R$ 0,00</span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end">
+                <button onclick="closePaymentModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                <button id="confirm-sale-button" type="button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>Confirmar Venda</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE SUCESSO -->
+    <div id="success-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-8 rounded-lg shadow-xl text-center">
+            <h3 id="modal-title" class="text-lg font-medium text-gray-900"></h3>
+            <p id="modal-message" class="mt-2 text-sm text-gray-500"></p>
+            <div id="modal-warning-area" class="hidden mt-4 bg-red-50 text-red-700 p-3 rounded-md text-left">
+                <p class="font-bold">Atenção!</p>
+                <p id="modal-warning-message" class="text-sm"></p>
+            </div>
+            <button onclick="closeModal()" class="mt-6 bg-indigo-600 text-white px-4 py-2 rounded-lg">Fechar</button>
+        </div>
+    </div>
+
+    <!-- NOVO: MODAL DO SCANNER -->
+    <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Aponte para o Código de Barras</h3>
+            <div id="reader" class="w-full rounded-md overflow-hidden"></div>
+            <button id="stop-scanner-button" class="mt-4 w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700">Parar Scanner</button>
+        </div>
+    </div>
+
+    <script>
+        // --- BASE DE DADOS INICIAL ---
+        let products = [
+            { sku: 'CAF-001', barcode: '789000000001', name: 'Café em Grãos 1kg', price: 45.50, stock: 5, minStock: 10 },
+            { sku: 'CHA-002', barcode: '789000000002', name: 'Chá Verde (Caixa)', price: 12.00, stock: 3, minStock: 15 },
+            { sku: 'AGU-004', barcode: '789000000004', name: 'Água Mineral 500ml', price: 2.50, stock: 50, minStock: 20 },
+            { sku: 'BIS-005', barcode: '789000000005', name: 'Biscoito Integral', price: 5.00, stock: 1, minStock: 10 },
+        ];
+        let customers = [
+            { id: 1, name: 'Cliente Padrão', cpf: '', phone: '' },
+            { id: 2, name: 'Maria da Silva', cpf: '111.222.333-44', phone: '(11) 98765-4321' },
+        ];
+        const users = ['Ana', 'Bruno', 'Carla'];
+        let cart = [];
+        let closedDays = [];
+        let currentDay = null;
+        let currentShift = null;
+        let saleInProgress = {};
+        let html5QrcodeScanner = null; // NOVO: Variável para o scanner
+
+        // --- ELEMENTOS DO DOM ---
+        const contentCashRegister = document.getElementById('content-cash-register');
+        const contentPdv = document.getElementById('content-pdv');
+        const contentInventory = document.getElementById('content-inventory');
+        const contentCustomers = document.getElementById('content-customers');
+        const contentReports = document.getElementById('content-reports');
+        const tabPdv = document.getElementById('tab-pdv');
+        const paymentModal = document.getElementById('payment-modal');
+        const confirmSaleButton = document.getElementById('confirm-sale-button');
+        const addPaymentForm = document.getElementById('add-payment-form');
+        const scannerModal = document.getElementById('scanner-modal');
+
+        // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
+        const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const formatDateTime = (date) => date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+        function showModal(title, message, warningMessage = '') {
+            const modal = document.getElementById('success-modal');
+            modal.querySelector('#modal-title').textContent = title;
+            modal.querySelector('#modal-message').textContent = message;
+            
+            const warningArea = modal.querySelector('#modal-warning-area');
+            const warningMessageEl = modal.querySelector('#modal-warning-message');
+
+            if (warningMessage) {
+                warningMessageEl.textContent = warningMessage;
+                warningArea.classList.remove('hidden');
+            } else {
+                warningArea.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('success-modal').classList.add('hidden');
+        }
+
+        // --- LÓGICA DAS ABAS ---
+        window.changeTab = function(tabName) {
+            if (tabName === 'pdv' && !currentShift) {
+                showModal('Nenhum Turno Aberto', 'Você precisa abrir um turno antes de acessar o PDV.');
+                return;
+            }
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+        
+        // --- RENDERIZAÇÃO GERAL E INICIALIZAÇÃO ---
+        function renderAll() {
+            renderCashRegisterTab();
+            renderPdvTab();
+            renderInventoryTab();
+            renderCustomersTab();
+            renderReportsTab();
+            updateCashRegisterStatus();
+        }
+
+        // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
+        function renderCashRegisterTab() {
+            const userOptions = users.map(user => `<option value="${user}">${user}</option>`).join('');
+            let html = '';
+
+            if (!currentDay) { // Estado 1: Dia Fechado
+                html = `
+                <div class="text-center py-12">
+                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Dia Fechado</h2>
+                    <form id="open-day-form" class="mt-6 max-w-sm mx-auto space-y-4">
+                        <div>
+                            <label for="initial-cash" class="block text-sm font-medium text-gray-700">Valor Inicial (Fundo de Troco do Dia)</label>
+                            <input type="number" id="initial-cash" placeholder="Ex: 100.00" step="0.01" min="0" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="opening-user" class="block text-sm font-medium text-gray-700">Operador do 1º Turno</label>
+                            <select id="opening-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg">Abrir Caixa (Iniciar Dia)</button>
+                    </form>
+                </div>`;
+            } else if (currentDay && currentShift) { // Estado 2: Dia Aberto, Turno Ativo
+                 html = `
+                <div class="text-center py-12">
+                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Turno Ativo</h2>
+                    <div class="mt-4 text-gray-600 space-y-2">
+                        <p>Início do Turno: <span class="font-semibold">${formatDateTime(currentShift.startTime)}</span></p>
+                        <p>Operador do Turno: <span class="font-semibold">${currentShift.openedBy}</span></p>
+                    </div>
+                    <div class="mt-8 max-w-sm mx-auto">
+                         <label for="closing-user" class="block text-sm font-medium text-gray-700">Operador de Fechamento</label>
+                         <select id="closing-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
+                         <button id="close-shift-button" class="mt-4 w-full bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg">Fechar Turno</button>
+                    </div>
+                </div>`;
+            } else { // Estado 3: Dia Aberto, Sem Turno Ativo
+                html = `
+                <div class="text-center py-12">
+                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Dia em Operação (Aguardando Turno)</h2>
+                    <div class="mt-6 max-w-sm mx-auto space-y-4">
+                        <form id="open-shift-form" class="space-y-4 p-4 border rounded-lg">
+                             <h3 class="font-semibold">Iniciar Próximo Turno</h3>
+                             <div>
+                                <label for="next-opening-user" class="block text-sm font-medium text-gray-700">Operador</label>
+                                <select id="next-opening-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
+                             </div>
+                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg">Abrir Novo Turno</button>
+                        </form>
+                        <button id="close-day-button" class="w-full bg-red-600 text-white font-bold py-3 px-8 rounded-lg">Fechar Dia e Gerar Relatório Final</button>
+                    </div>
+                </div>`;
+            }
+            contentCashRegister.innerHTML = html;
+            // Adicionar event listeners aos elementos recém-criados
+            document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
+            document.getElementById('close-shift-button')?.addEventListener('click', handleCloseShift);
+            document.getElementById('open-shift-form')?.addEventListener('submit', handleOpenShift);
+            document.getElementById('close-day-button')?.addEventListener('click', handleCloseDay);
+        }
+
+        function renderPdvTab() {
+            contentPdv.innerHTML = `
+                 <div id="pdv-idle-screen" class="text-center py-20">
+                    <h2 class="mt-4 text-2xl font-bold text-gray-700">Caixa Livre</h2>
+                    <button id="start-sale-button" class="mt-6 bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg">Iniciar Nova Venda</button>
+                </div>
+                <div id="pdv-active-sale" class="grid grid-cols-1 lg:grid-cols-2 gap-8 hidden">
+                    <div>
+                        <div class="mb-6">
+                            <label for="barcode-input-field" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
+                            <input type="text" id="barcode-input-field" placeholder="Aguardando leitura do código..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                        </div>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-4">Ou adicione manualmente</h3>
+                        <div id="product-list" class="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2"></div>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-xl">
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Carrinho de Compras</h3>
+                        <div id="cart-items" class="min-h-[200px] max-h-[40vh] overflow-y-auto pr-2"></div>
+                        <div class="mt-6 pt-6 border-t">
+                            <p class="text-2xl font-bold text-gray-800 text-right">Total: <span id="cart-total" class="text-indigo-600">R$ 0,00</span></p>
+                            <button id="checkout-button" class="mt-4 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-gray-400" disabled>Finalizar Venda</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('start-sale-button').addEventListener('click', startNewSale);
+            document.getElementById('checkout-button').addEventListener('click', handleCheckout);
+            document.getElementById('barcode-input-field').addEventListener('keypress', handleBarcodeKeypress);
+            renderProductList();
+            renderCart();
+        }
+
+        function renderInventoryTab() {
+             contentInventory.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <div class="mb-8">
+                            <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
+                            <div class="bg-gray-50 p-6 rounded-lg text-center">
+                                <p class="text-gray-600 mb-4">Use a câmera do celular para cadastrar ou adicionar estoque a um item rapidamente.</p>
+                                <button id="scan-inventory-button" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M3 6h18"/><path d="M3 10h18"/><path d="M3 14h18"/><path d="M3 18h18"/></svg>
+                                    Escanear com a Câmera
+                                </button>
+                            </div>
+                        </div>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-6">Adicionar Novo Produto (Manual)</h3>
+                        <form id="add-product-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
+                            <input type="text" id="new-sku" placeholder="Código Interno (SKU)" required class="w-full p-2 border rounded">
+                            <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
+                            <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
+                            <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
+                        </form>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Visão Geral do Estoque</h3>
+                        <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-100"><tr><th class="p-3 font-semibold text-gray-600">Produto</th><th class="p-3 font-semibold text-gray-600 text-center">Estoque</th></tr></thead>
+                                <tbody id="inventory-management-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('add-product-form').addEventListener('submit', handleAddProduct);
+            document.getElementById('scan-inventory-button').addEventListener('click', startInventoryScan);
+            renderInventoryManagement();
+        }
+
+        function renderCustomersTab() {
+            contentCustomers.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Adicionar Novo Cliente</h3>
+                        <form id="add-customer-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
+                            <input type="text" id="new-customer-name" placeholder="Nome Completo" required class="w-full p-2 border rounded">
+                            <input type="text" id="new-customer-cpf" placeholder="CPF (opcional)" class="w-full p-2 border rounded">
+                            <input type="text" id="new-customer-phone" placeholder="Telefone (opcional)" class="w-full p-2 border rounded">
+                            <button type="submit" class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar Cliente</button>
+                        </form>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Clientes Cadastrados</h3>
+                        <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-100"><tr><th class="p-3 font-semibold text-gray-600">Nome</th><th class="p-3 font-semibold text-gray-600">Contato</th></tr></thead>
+                                <tbody id="customer-list-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('add-customer-form').addEventListener('submit', handleAddCustomer);
+            renderCustomersList();
+        }
+        
+        function renderReportsTab() {
+            contentReports.innerHTML = `
+                <h3 class="font-semibold text-xl text-gray-700 mb-4">Histórico de Dias de Operação</h3>
+                <div id="session-reports-container" class="space-y-6">
+                </div>
+            `;
+            renderSessionReports();
+        }
+        
+        // --- LÓGICA DE GESTÃO DE CAIXA ---
+        function updateCashRegisterStatus() {
+            tabPdv.disabled = !currentShift;
+        }
+        
+        function handleOpenDay(event) {
+            event.preventDefault();
+            const initialCash = parseFloat(document.getElementById('initial-cash').value);
+            const openedBy = document.getElementById('opening-user').value;
+            if (isNaN(initialCash) || initialCash < 0) {
+                showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
+                return;
+            }
+            currentDay = { id: closedDays.length + 1, date: new Date(), initialCash, shifts: [], status: 'open' };
+            handleOpenShift(null, openedBy);
+        }
+
+        function handleOpenShift(event, user) {
+            if(event) event.preventDefault();
+            const openedBy = user || document.getElementById('next-opening-user').value;
+            currentShift = { id: currentDay.shifts.length + 1, startTime: new Date(), endTime: null, openedBy, closedBy: null, sales: [] };
+            renderCashRegisterTab();
+            updateCashRegisterStatus();
+            showModal('Turno Aberto!', 'Você já pode iniciar as vendas.');
+        }
+
+        function handleCloseShift() {
+            if (!currentShift) return;
+            const closedBy = document.getElementById('closing-user').value;
+            currentShift.endTime = new Date();
+            currentShift.closedBy = closedBy;
+            currentDay.shifts.push(currentShift);
+            currentShift = null;
+            renderCashRegisterTab();
+            updateCashRegisterStatus();
+            showModal('Turno Fechado', 'O próximo operador pode iniciar um novo turno ou o dia pode ser fechado.');
+        }
+        
+        function handleCloseDay() {
+            if (!currentDay || currentShift) {
+                showModal('Ação Inválida', 'Feche o turno atual antes de fechar o dia.');
+                return;
+            }
+            currentDay.status = 'closed';
+            closedDays.push(currentDay);
+            currentDay = null;
+            renderCashRegisterTab();
+            updateCashRegisterStatus();
+            renderReportsTab();
+            showModal('Dia Fechado', 'O dia de operações foi encerrado e o relatório final gerado.');
+            changeTab('reports');
+        }
+
+        // --- LÓGICA DE CLIENTES ---
+        function handleAddCustomer(event) {
+            event.preventDefault();
+            const name = document.getElementById('new-customer-name').value.trim();
+            const cpf = document.getElementById('new-customer-cpf').value.trim();
+            const phone = document.getElementById('new-customer-phone').value.trim();
+            if (!name) {
+                showModal('Erro', 'O nome do cliente é obrigatório.');
+                return;
+            }
+            const newCustomer = { id: Date.now(), name, cpf, phone };
+            customers.push(newCustomer);
+            renderCustomersList();
+            document.getElementById('add-customer-form').reset();
+            showModal('Sucesso!', 'Novo cliente cadastrado.');
+        }
+
+        function renderCustomersList() {
+            const customerListBody = document.getElementById('customer-list-body');
+            if (!customerListBody) return;
+            customerListBody.innerHTML = '';
+            customers.forEach(customer => {
+                customerListBody.innerHTML += `
+                    <tr>
+                        <td class="p-3">${customer.name}</td>
+                        <td class="p-3">${customer.phone || customer.cpf || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- LÓGICA DE VENDA E PAGAMENTO ---
+        function resetPdv() {
+            cart = [];
+            renderCart();
+            document.getElementById('pdv-idle-screen').classList.remove('hidden');
+            document.getElementById('pdv-active-sale').classList.add('hidden');
+        }
+
+        function startNewSale() {
+            document.getElementById('pdv-idle-screen').classList.add('hidden');
+            document.getElementById('pdv-active-sale').classList.remove('hidden');
+            document.getElementById('barcode-input-field').focus();
+        }
+
+        function handleBarcodeKeypress(e) {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                e.preventDefault();
+                handleBarcodeScan(e.target.value.trim());
+                e.target.value = '';
+            }
+        }
+        
+        function handleBarcodeScan(scannedCode) {
+            const product = products.find(p => p.barcode === scannedCode);
+            if (product) {
+                addToCart(product.sku);
+            } else {
+                showModal('Produto não encontrado', `Nenhum produto corresponde ao código '${scannedCode}'.`);
+            }
+        }
+
+        function addToCart(sku) {
+            const product = products.find(p => p.sku === sku);
+            const cartItem = cart.find(item => item.sku === sku);
+            const availableStock = product.stock - (cartItem ? cartItem.quantity : 0);
+            if (availableStock <= 0) {
+                showModal('Estoque Insuficiente', `Não há mais estoque para ${product.name}.`);
+                return;
+            }
+            if (cartItem) cartItem.quantity++;
+            else cart.push({ ...product, quantity: 1 });
+            renderCart();
+        }
+        
+        function renderCart() {
+            const cartItemsEl = document.getElementById('cart-items');
+            const checkoutButton = document.getElementById('checkout-button');
+            const cartTotalEl = document.getElementById('cart-total');
+            if (cart.length === 0) {
+                cartItemsEl.innerHTML = '<p class="text-gray-500 text-center pt-16">Carrinho vazio.</p>';
+                checkoutButton.disabled = true;
+            } else {
+                cartItemsEl.innerHTML = '';
+                cart.forEach(item => {
+                    cartItemsEl.innerHTML += `
+                        <div class="flex items-center mb-3">
+                            <div class="flex-grow"><p class="font-semibold">${item.name}</p></div>
+                            <div class="flex items-center">
+                                <button onclick="updateCartQuantity('${item.sku}', -1)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">-</button>
+                                <span class="w-10 text-center font-semibold">${item.quantity}</span>
+                                <button onclick="updateCartQuantity('${item.sku}', 1)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">+</button>
+                            </div>
+                        </div>`;
+                });
+                checkoutButton.disabled = false;
+            }
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            cartTotalEl.textContent = formatCurrency(total);
+        }
+
+        window.updateCartQuantity = function(sku, change) {
+            const cartItem = cart.find(item => item.sku === sku);
+            if (!cartItem) return;
+            if (change > 0) {
+                const product = products.find(p => p.sku === sku);
+                if (product.stock - cartItem.quantity <= 0) {
+                    showModal('Estoque Insuficiente', `Não há mais estoque para ${product.name}.`);
+                    return;
+                }
+            }
+            cartItem.quantity += change;
+            if (cartItem.quantity <= 0) cart = cart.filter(item => item.sku !== sku);
+            if (cart.length === 0) resetPdv();
+            renderCart();
+        }
+
+        function handleCheckout() {
+            if (cart.length === 0) return;
+            saleInProgress = {
+                items: JSON.parse(JSON.stringify(cart)),
+                total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                payments: [],
+                customerId: 1,
+            };
+            renderPaymentModal();
+            paymentModal.classList.remove('hidden');
+            setTimeout(() => paymentModal.querySelector('div').classList.add('scale-100'), 10);
+        }
+        
+        function renderPaymentModal() {
+            const total = saleInProgress.total;
+            const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+            const change = totalPaid > total ? totalPaid - total : 0;
+            
+            document.getElementById('payment-modal-total').textContent = formatCurrency(total);
+            document.getElementById('payment-modal-paid-amount').textContent = formatCurrency(totalPaid);
+            document.getElementById('payment-modal-change').textContent = formatCurrency(change);
+            
+            const customerSelect = document.getElementById('payment-modal-customer-select');
+            customerSelect.innerHTML = customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            customerSelect.value = saleInProgress.customerId;
+
+            document.getElementById('payment-modal-cart-summary').innerHTML = saleInProgress.items.map(i => `<div>${i.quantity}x ${i.name}</div>`).join('');
+            document.getElementById('payment-modal-payments-list').innerHTML = saleInProgress.payments.map(p => `<div class="flex justify-between bg-white p-1 rounded"><span>${p.method}</span><span class="font-semibold">${formatCurrency(p.amount)}</span></div>`).join('');
+
+            const remainingAmount = total - totalPaid;
+            document.getElementById('payment-amount').value = (remainingAmount > 0) ? remainingAmount.toFixed(2) : '';
+            confirmSaleButton.disabled = totalPaid < total;
+        }
+
+        function handleAddPayment(event) {
+            event.preventDefault();
+            const method = document.getElementById('payment-method').value;
+            const amount = parseFloat(document.getElementById('payment-amount').value);
+            if (isNaN(amount) || amount <= 0) {
+                showModal('Erro', 'Valor de pagamento inválido.');
+                return;
+            }
+            saleInProgress.payments.push({ method, amount });
+            renderPaymentModal();
+        }
+        
+        window.closePaymentModal = function() {
+            paymentModal.querySelector('div').classList.remove('scale-100');
+            setTimeout(() => paymentModal.classList.add('hidden'), 200);
+        }
+
+        function confirmSale() {
+            saleInProgress.id = (currentShift.sales.length + 1);
+            saleInProgress.date = new Date();
+            saleInProgress.customerId = parseInt(document.getElementById('payment-modal-customer-select').value);
+            
+            currentShift.sales.push(saleInProgress);
+
+            const lowStockItems = [];
+            saleInProgress.items.forEach(cartItem => {
+                const productInDb = products.find(p => p.sku === cartItem.sku);
+                if (productInDb) {
+                    productInDb.stock -= cartItem.quantity;
+                    if (productInDb.stock <= 2) {
+                        lowStockItems.push(productInDb.name);
+                    }
+                }
+            });
+            
+            const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+            const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
+
+            renderAll();
+            resetPdv();
+            closePaymentModal();
+            
+            let mainMessage = `Troco: ${formatCurrency(change)}`;
+            let warningMessage = '';
+            if (lowStockItems.length > 0) {
+                warningMessage = `Estoque baixo para: ${lowStockItems.join(', ')}`;
+            }
+            showModal('Venda Confirmada!', mainMessage, warningMessage);
+        }
+
+        // --- OUTRAS LÓGICAS ---
+        function renderProductList() {
+            const productListEl = document.getElementById('product-list');
+            if (!productListEl) return;
+            productListEl.innerHTML = '';
+            products.forEach(product => {
+                const productInStock = product.stock > 0;
+                productListEl.innerHTML += `
+                    <div class="border rounded-lg p-3 flex flex-col justify-between ${!productInStock ? 'bg-gray-100 opacity-60' : 'bg-white'}">
+                        <div><p class="font-bold">${product.name}</p><p class="text-gray-600">${formatCurrency(product.price)}</p></div>
+                        <button onclick="addToCart('${product.sku}')" class="mt-3 w-full text-sm font-bold py-2 rounded-md ${productInStock ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-300 cursor-not-allowed'}" ${!productInStock ? 'disabled' : ''}>Add</button>
+                    </div>`;
+            });
+        }
+        
+        function renderInventoryManagement() {
+            const inventoryManagementTableBodyEl = document.getElementById('inventory-management-table-body');
+            if (!inventoryManagementTableBodyEl) return;
+            inventoryManagementTableBodyEl.innerHTML = '';
+
+            const sortedProducts = [...products].sort((a, b) => {
+                const aIsLow = a.stock <= 2;
+                const bIsLow = b.stock <= 2;
+                if (aIsLow && !bIsLow) return -1;
+                if (!aIsLow && bIsLow) return 1;
+                return 0;
+            });
+
+            sortedProducts.forEach(product => {
+                const isLowStock = product.stock <= 2;
+                const rowClass = isLowStock ? 'low-stock-row' : '';
+                const textClass = isLowStock ? 'low-stock-text' : '';
+
+                inventoryManagementTableBodyEl.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td class="p-3">${product.name}</td>
+                        <td class="p-3 text-center ${textClass}">${product.stock}</td>
+                    </tr>
+                `;
+            });
+        }
+        
+        function handleAddProduct(event) {
+            event.preventDefault();
+            const sku = document.getElementById('new-sku').value.trim();
+            const barcode = document.getElementById('new-barcode').value.trim();
+            const name = document.getElementById('new-name').value.trim();
+            const price = parseFloat(document.getElementById('new-price').value);
+            const stock = parseInt(document.getElementById('new-stock').value);
+            const minStock = parseInt(document.getElementById('new-min-stock').value);
+
+            if(!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
+                showModal('Erro', 'Preencha todos os campos obrigatórios.');
+                return;
+            }
+
+            products.push({ sku, barcode, name, price, stock, minStock });
+            renderInventoryManagement();
+            document.getElementById('add-product-form').reset();
+            showModal('Sucesso', 'Produto adicionado.');
+        }
+
+        // NOVO: Funções do Scanner
+        function startInventoryScan() {
+            scannerModal.classList.remove('hidden');
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            .catch(err => {
+                console.error("Erro ao iniciar o scanner", err);
+                showModal("Erro de Câmera", "Não foi possível aceder à câmera. Verifique as permissões do navegador.");
+                stopInventoryScan();
+            });
+        }
+
+        function stopInventoryScan() {
+            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+                html5QrcodeScanner.stop().catch(err => console.error("Erro ao parar scanner.", err));
+            }
+            scannerModal.classList.add('hidden');
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            stopInventoryScan();
+            handleInventoryScanResult(decodedText);
+        }
+
+        function handleInventoryScanResult(barcode) {
+            if (!barcode || barcode.trim() === '') return;
+
+            const product = products.find(p => p.barcode === barcode.trim());
+            if (product) {
+                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+                const quantity = parseInt(quantityStr);
+                if (!isNaN(quantity) && quantity > 0) {
+                    product.stock += quantity;
+                    renderInventoryManagement();
+                    showModal('Sucesso', `${quantity} unidades de ${product.name} adicionadas ao estoque.`);
+                } else if(quantityStr !== null) { // Evita alerta se o user cancelar
+                    showModal('Erro', 'Quantidade inválida.');
+                }
+            } else {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
+                    renderInventoryTab();
+                    changeTab('inventory');
+                    document.getElementById('new-barcode').value = barcode.trim();
+                    document.getElementById('new-sku').focus();
+                }
+            }
+        }
+        
+        function renderSessionReports() {
+            const container = document.getElementById('session-reports-container');
+            if (!container) return;
+
+            if (closedDays.length === 0) {
+                container.innerHTML = `<p id="no-sessions-message" class="text-gray-500">Nenhum dia de operação foi fechado ainda.</p>`;
+            } else {
+                let reportsHTML = '';
+                closedDays.slice().reverse().forEach(day => {
+                    const allSales = day.shifts.flatMap(s => s.sales);
+                    const totalSalesValue = allSales.reduce((sum, sale) => sum + sale.total, 0);
+                    const paymentsSummary = allSales.flatMap(s => s.payments).reduce((acc, p) => {
+                        acc[p.method] = (acc[p.method] || 0) + p.amount;
+                        return acc;
+                    }, {});
+                    const totalCashInPayments = (paymentsSummary['Dinheiro'] || 0);
+                    const expectedCashInDrawer = day.initialCash + totalCashInPayments;
+
+                    let shiftsDetailsHTML = day.shifts.map(shift => {
+                        const shiftTotal = shift.sales.reduce((sum, s) => sum + s.total, 0);
+                        return `
+                        <div class="ml-4 mt-2 p-2 bg-white rounded border">
+                            <p class="font-semibold">Turno #${shift.id}</p>
+                            <p class="text-xs text-gray-500">Operadores: ${shift.openedBy} (Abertura) / ${shift.closedBy} (Fecho)</p>
+                            <p class="text-xs text-gray-500">Período: ${formatDateTime(shift.startTime)} - ${formatDateTime(shift.endTime)}</p>
+                            <p class="text-sm">Vendas no turno: ${formatCurrency(shiftTotal)}</p>
+                        </div>
+                        `
+                    }).join('');
+
+                    reportsHTML += `
+                        <details class="bg-gray-50 p-4 rounded-lg border">
+                            <summary class="cursor-pointer">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-bold text-lg">Relatório do Dia #${day.id}</p>
+                                        <p class="text-sm text-gray-600">Data: ${new Date(day.date).toLocaleDateString()}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm">Total de Vendas do Dia</p>
+                                        <p class="font-bold text-xl">${formatCurrency(totalSalesValue)}</p>
+                                    </div>
+                                </div>
+                            </summary>
+                            <div class="mt-4 pt-4 border-t">
+                                <p class="font-semibold">Resumo Financeiro do Dia</p>
+                                <div class="text-sm mt-2 space-y-1">
+                                    <div class="flex justify-between"><span>Fundo de Troco Inicial:</span> <span>${formatCurrency(day.initialCash)}</span></div>
+                                    ${Object.entries(paymentsSummary).map(([method, amount]) => `<div class="flex justify-between"><span>Total em ${method}:</span> <span>${formatCurrency(amount)}</span></div>`).join('')}
+                                    <div class="flex justify-between font-bold mt-2 pt-2 border-t">
+                                        <span>Esperado em Dinheiro (Final):</span>
+                                        <span>${formatCurrency(expectedCashInDrawer)}</span>
+                                    </div>
+                                </div>
+                                <p class="font-semibold mt-4">Detalhes dos Turnos (${day.shifts.length})</p>
+                                ${shiftsDetailsHTML}
+                            </div>
+                        </details>
+                    `;
+                });
+                container.innerHTML = reportsHTML;
+            }
+        }
+
+        // --- INICIALIZAÇÃO E EVENTOS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderAll();
+            addPaymentForm.addEventListener('submit', handleAddPayment);
+            confirmSaleButton.addEventListener('click', confirmSale);
+            document.getElementById('stop-scanner-button').addEventListener('click', stopInventoryScan);
+        });
+    </script>
+</body>
+</html>
