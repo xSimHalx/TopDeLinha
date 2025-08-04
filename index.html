@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Caixa e Estoque v9.0 (Scanner Real)</title>
+    <title>Simulador de Caixa e Estoque v9.1 (Ajustes Visuais)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- NOVO: Biblioteca para o scanner de código de barras -->
@@ -33,16 +33,26 @@
             color: #b91c1c; /* red-700 */
             font-weight: bold;
         }
-        /* Estilo para o leitor de QR Code */
         #reader {
             border: 2px solid #e5e7eb;
             border-radius: 0.5rem;
         }
+        /* NOVO: Estilo para botões de pagamento */
+        .payment-method-btn {
+            border: 2px solid #d1d5db;
+            transition: all 0.2s ease;
+        }
+        .payment-method-btn.active {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+            color: #4338ca;
+            font-weight: 600;
+        }
     </style>
 </head>
-<body class="bg-gray-100 h-screen text-gray-800">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="flex flex-col h-full bg-white">
+    <div class="w-full max-w-7xl h-[90vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
         <header class="bg-gray-800 p-6 flex-shrink-0">
             <h1 class="text-2xl sm:text-3xl font-bold text-white">Sistema Integrado de Gestão</h1>
             <p class="text-gray-300 mt-1">PDV | Estoque | Caixa | Clientes | Relatórios</p>
@@ -103,16 +113,14 @@
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg space-y-4">
                     <h4 class="font-semibold text-lg">Pagamento</h4>
+                    <!-- NOVO: Botões de Pagamento -->
+                    <div id="payment-method-options" class="grid grid-cols-2 gap-2">
+                        <button data-method="Dinheiro" class="payment-method-btn p-3 rounded-md">Dinheiro</button>
+                        <button data-method="Cartão de Crédito" class="payment-method-btn p-3 rounded-md">Crédito</button>
+                        <button data-method="Cartão de Débito" class="payment-method-btn p-3 rounded-md">Débito</button>
+                        <button data-method="Pix" class="payment-method-btn p-3 rounded-md">Pix</button>
+                    </div>
                     <form id="add-payment-form" class="flex items-end gap-2">
-                        <div class="flex-grow">
-                            <label for="payment-method" class="block text-sm font-medium">Forma</label>
-                            <select id="payment-method" class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm">
-                                <option>Dinheiro</option>
-                                <option>Cartão de Crédito</option>
-                                <option>Cartão de Débito</option>
-                                <option>Pix</option>
-                            </select>
-                        </div>
                         <div class="flex-grow">
                              <label for="payment-amount" class="block text-sm font-medium">Valor</label>
                             <input type="number" id="payment-amount" step="0.01" min="0.01" required class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm">
@@ -146,7 +154,7 @@
         </div>
     </div>
 
-    <!-- NOVO: MODAL DO SCANNER -->
+    <!-- MODAL DO SCANNER -->
     <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4">
             <h3 class="text-xl font-bold text-gray-900 mb-4">Aponte para o Código de Barras</h3>
@@ -173,7 +181,8 @@
         let currentDay = null;
         let currentShift = null;
         let saleInProgress = {};
-        let html5QrcodeScanner = null; // NOVO: Variável para o scanner
+        let html5QrcodeScanner = null;
+        let selectedPaymentMethod = 'Dinheiro'; // NOVO
 
         // --- ELEMENTOS DO DOM ---
         const contentCashRegister = document.getElementById('content-cash-register');
@@ -243,7 +252,8 @@
             if (!currentDay) { // Estado 1: Dia Fechado
                 html = `
                 <div class="text-center py-12">
-                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Dia Fechado</h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-red-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Caixa Fechado</h2>
                     <form id="open-day-form" class="mt-6 max-w-sm mx-auto space-y-4">
                         <div>
                             <label for="initial-cash" class="block text-sm font-medium text-gray-700">Valor Inicial (Fundo de Troco do Dia)</label>
@@ -259,6 +269,7 @@
             } else if (currentDay && currentShift) { // Estado 2: Dia Aberto, Turno Ativo
                  html = `
                 <div class="text-center py-12">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-green-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 5-5 5 5 0 0 1 5 5v4"></path></svg>
                     <h2 class="mt-4 text-2xl font-bold text-gray-800">Turno Ativo</h2>
                     <div class="mt-4 text-gray-600 space-y-2">
                         <p>Início do Turno: <span class="font-semibold">${formatDateTime(currentShift.startTime)}</span></p>
@@ -273,6 +284,7 @@
             } else { // Estado 3: Dia Aberto, Sem Turno Ativo
                 html = `
                 <div class="text-center py-12">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-blue-500"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v6l4 2"></path></svg>
                     <h2 class="mt-4 text-2xl font-bold text-gray-800">Dia em Operação (Aguardando Turno)</h2>
                     <div class="mt-6 max-w-sm mx-auto space-y-4">
                         <form id="open-shift-form" class="space-y-4 p-4 border rounded-lg">
@@ -606,17 +618,24 @@
             const remainingAmount = total - totalPaid;
             document.getElementById('payment-amount').value = (remainingAmount > 0) ? remainingAmount.toFixed(2) : '';
             confirmSaleButton.disabled = totalPaid < total;
+
+            // Lógica dos botões de pagamento
+            document.querySelectorAll('.payment-method-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.method === selectedPaymentMethod) {
+                    btn.classList.add('active');
+                }
+            });
         }
 
         function handleAddPayment(event) {
             event.preventDefault();
-            const method = document.getElementById('payment-method').value;
             const amount = parseFloat(document.getElementById('payment-amount').value);
             if (isNaN(amount) || amount <= 0) {
                 showModal('Erro', 'Valor de pagamento inválido.');
                 return;
             }
-            saleInProgress.payments.push({ method, amount });
+            saleInProgress.payments.push({ method: selectedPaymentMethod, amount });
             renderPaymentModal();
         }
         
@@ -720,7 +739,6 @@
             showModal('Sucesso', 'Produto adicionado.');
         }
 
-        // NOVO: Funções do Scanner
         function startInventoryScan() {
             scannerModal.classList.remove('hidden');
             html5QrcodeScanner = new Html5Qrcode("reader");
@@ -757,7 +775,7 @@
                     product.stock += quantity;
                     renderInventoryManagement();
                     showModal('Sucesso', `${quantity} unidades de ${product.name} adicionadas ao estoque.`);
-                } else if(quantityStr !== null) { // Evita alerta se o user cancelar
+                } else if(quantityStr !== null) {
                     showModal('Erro', 'Quantidade inválida.');
                 }
             } else {
@@ -840,6 +858,13 @@
             addPaymentForm.addEventListener('submit', handleAddPayment);
             confirmSaleButton.addEventListener('click', confirmSale);
             document.getElementById('stop-scanner-button').addEventListener('click', stopInventoryScan);
+            // Adiciona listener para os botões de pagamento
+            paymentModal.addEventListener('click', (e) => {
+                if (e.target.classList.contains('payment-method-btn')) {
+                    selectedPaymentMethod = e.target.dataset.method;
+                    renderPaymentModal();
+                }
+            });
         });
     </script>
 </body>
