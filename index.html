@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Caixa e Estoque v9.5 (Bloqueio de Fiado)</title>
+    <title>Simulador de Caixa e Estoque v11.2 (Login Corrigido)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -50,37 +51,59 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="w-full max-w-7xl h-[90vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
-        <header class="bg-gray-800 p-6 flex-shrink-0">
-            <h1 class="text-2xl sm:text-3xl font-bold text-white">Sistema Integrado de Gestão</h1>
-            <p class="text-gray-300 mt-1">PDV | Estoque | Caixa | Clientes | Relatórios</p>
+    <!-- Ecrã de Login -->
+    <div id="login-screen" class="w-full max-w-sm">
+        <div class="bg-white p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-center text-gray-800">Acesso ao Sistema</h2>
+            <p class="text-center text-gray-500 text-sm mt-2">Por favor, insira as suas credenciais.</p>
+            <form id="login-form" class="mt-8 space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input id="email" name="email" type="email" autocomplete="email" required class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="cliente@loja.com">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="123456">
+                </div>
+                <div class="text-sm text-center">
+                    <a href="#" id="forgot-password-link" class="font-medium text-indigo-600 hover:text-indigo-500">Esqueceu a sua senha?</a>
+                </div>
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sistema Principal (inicialmente oculto) -->
+    <div id="main-app" class="w-full max-w-7xl h-[90vh] flex-col bg-white rounded-xl shadow-2xl overflow-hidden hidden">
+        <header class="bg-gray-800 p-6 flex-shrink-0 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-white">Sistema Integrado de Gestão</h1>
+                <p class="text-gray-300 mt-1">PDV | Estoque | Caixa | Clientes | Relatórios</p>
+            </div>
+            <div>
+                <button id="logout-button" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 text-sm">Sair</button>
+            </div>
         </header>
 
         <!-- Abas de Navegação -->
         <div class="border-b border-gray-200 flex-shrink-0">
             <nav class="flex -mb-px px-4 space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs">
-                <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button active text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
-                    Gestão de Caixa
-                </button>
-                <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg" disabled>
-                    Frente de Caixa (PDV)
-                </button>
-                <button onclick="changeTab('inventory')" id="tab-inventory" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
-                    Estoque
-                </button>
-                <button onclick="changeTab('customers')" id="tab-customers" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
-                    Clientes & Fiado
-                </button>
-                <button onclick="changeTab('reports')" id="tab-reports" class="tab-button text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm rounded-t-lg">
-                    Relatórios
-                </button>
+                <button onclick="changeTab('dashboard')" id="tab-dashboard" class="tab-button active">Dashboard</button>
+                <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button">Gestão de Caixa</button>
+                <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button" disabled>Frente de Caixa (PDV)</button>
+                <button onclick="changeTab('inventory')" id="tab-inventory" class="tab-button">Estoque</button>
+                <button onclick="changeTab('customers')" id="tab-customers" class="tab-button">Clientes & Fiado</button>
+                <button onclick="changeTab('reports')" id="tab-reports" class="tab-button">Relatórios</button>
             </nav>
         </div>
 
         <!-- Conteúdo Principal Rolável -->
         <main class="flex-grow overflow-y-auto">
             <div class="p-4 sm:p-6 md:p-8">
-                <div id="content-cash-register" class="tab-content"></div>
+                <div id="content-dashboard" class="tab-content"></div>
+                <div id="content-cash-register" class="tab-content hidden"></div>
                 <div id="content-pdv" class="tab-content hidden"></div>
                 <div id="content-inventory" class="tab-content hidden"></div>
                 <div id="content-customers" class="tab-content hidden"></div>
@@ -89,7 +112,7 @@
         </main>
     </div>
 
-    <!-- MODAL DE PAGAMENTO -->
+    <!-- MODAIS -->
     <div id="payment-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all scale-95">
             <div class="p-6 border-b flex justify-between items-center">
@@ -105,7 +128,7 @@
                         <p id="payment-modal-total" class="text-3xl font-bold text-indigo-600"></p>
                     </div>
                     <div>
-                        <label for="payment-modal-customer-select" class="block text-sm font-medium text-gray-700">Associar Cliente (obrigatório para fiado)</label>
+                        <label for="payment-modal-customer-select" class="block text-sm font-medium text-gray-700">Associar Cliente (opcional)</label>
                         <select id="payment-modal-customer-select" class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm"></select>
                     </div>
                 </div>
@@ -116,7 +139,6 @@
                         <button data-method="Cartão de Crédito" class="payment-method-btn p-3 rounded-md">Crédito</button>
                         <button data-method="Cartão de Débito" class="payment-method-btn p-3 rounded-md">Débito</button>
                         <button data-method="Pix" class="payment-method-btn p-3 rounded-md">Pix</button>
-                        <button data-method="Fiado" class="payment-method-btn p-3 rounded-md col-span-2 bg-orange-50 border-orange-200 text-orange-700">Fiado (na conta)</button>
                     </div>
                     <form id="add-payment-form" class="flex items-end gap-2">
                         <div class="flex-grow">
@@ -138,8 +160,6 @@
             </div>
         </div>
     </div>
-
-    <!-- MODAL DE SUCESSO -->
     <div id="success-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
         <div class="bg-white p-8 rounded-lg shadow-xl text-center">
             <h3 id="modal-title" class="text-lg font-medium text-gray-900"></h3>
@@ -151,8 +171,6 @@
             <button onclick="closeModal()" class="mt-6 bg-indigo-600 text-white px-4 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
-
-    <!-- MODAL DO SCANNER -->
     <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4">
             <h3 class="text-xl font-bold text-gray-900 mb-4">Aponte para o Código de Barras</h3>
@@ -160,8 +178,6 @@
             <button id="stop-scanner-button" class="mt-4 w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700">Parar Scanner</button>
         </div>
     </div>
-
-    <!-- MODAL DE EDIÇÃO DE CLIENTE -->
     <div id="edit-customer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6 border-b">
@@ -188,8 +204,6 @@
             </div>
         </div>
     </div>
-
-    <!-- MODAL DE RECEBIMENTO DE DÍVIDA -->
     <div id="debt-payment-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6 border-b">
@@ -203,7 +217,10 @@
                 </div>
                 <div>
                     <label for="debt-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
-                    <input type="number" id="debt-payment-amount" step="0.01" min="0.01" required class="mt-1 block w-full p-2 border rounded-md">
+                    <div class="flex items-center gap-2 mt-1">
+                        <input type="number" id="debt-payment-amount" step="0.01" min="0.01" required class="block w-full p-2 border rounded-md">
+                        <button type="button" id="pay-full-debt-button" class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-2 rounded-md hover:bg-blue-200 whitespace-nowrap">Pagar Total</button>
+                    </div>
                 </div>
                 <div>
                     <label for="debt-payment-method" class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
@@ -221,19 +238,16 @@
             </div>
         </div>
     </div>
-
+    
     <script>
         // --- BASE DE DADOS INICIAL ---
         let products = [
             { sku: 'CAF-001', barcode: '789000000001', name: 'Café em Grãos 1kg', price: 45.50, stock: 5, minStock: 10 },
             { sku: 'CHA-002', barcode: '789000000002', name: 'Chá Verde (Caixa)', price: 12.00, stock: 3, minStock: 15 },
-            { sku: 'AGU-004', barcode: '789000000004', name: 'Água Mineral 500ml', price: 2.50, stock: 50, minStock: 20 },
-            { sku: 'BIS-005', barcode: '789000000005', name: 'Biscoito Integral', price: 5.00, stock: 1, minStock: 10 },
         ];
         let customers = [
             { id: 1, name: 'Cliente Padrão', cpf: '', phone: '', debt: 0 },
             { id: 2, name: 'Maria da Silva', cpf: '111.222.333-44', phone: '(11) 98765-4321', debt: 75.50 },
-            { id: 3, name: 'João Pereira', cpf: '222.333.444-55', phone: '(21) 91234-5678', debt: 0 },
         ];
         const users = ['Ana', 'Bruno', 'Carla'];
         let cart = [];
@@ -243,8 +257,15 @@
         let saleInProgress = {};
         let html5QrcodeScanner = null;
         let selectedPaymentMethod = 'Dinheiro';
+        let salesChart = null;
 
         // --- ELEMENTOS DO DOM ---
+        const loginScreen = document.getElementById('login-screen');
+        const mainApp = document.getElementById('main-app');
+        const loginForm = document.getElementById('login-form');
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        const logoutButton = document.getElementById('logout-button');
+        const contentDashboard = document.getElementById('content-dashboard');
         const contentCashRegister = document.getElementById('content-cash-register');
         const contentPdv = document.getElementById('content-pdv');
         const contentInventory = document.getElementById('content-inventory');
@@ -257,7 +278,7 @@
         const scannerModal = document.getElementById('scanner-modal');
         const editCustomerModal = document.getElementById('edit-customer-modal');
         const debtPaymentModal = document.getElementById('debt-payment-modal');
-
+        
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
         const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -284,6 +305,46 @@
             document.getElementById('success-modal').classList.add('hidden');
         }
 
+        // --- LÓGICA DE AUTENTICAÇÃO SIMULADA ---
+        function handleLogin(event) {
+            event.preventDefault();
+            const email = loginForm.email.value;
+            const password = loginForm.password.value;
+            
+            if (email === 'cliente@loja.com' && password === '123456') {
+                sessionStorage.setItem('loggedInUser', email);
+                checkAuthState();
+            } else {
+                showModal("Erro de Login", "Email ou senha incorretos. Por favor, tente novamente.");
+            }
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('loggedInUser');
+            checkAuthState();
+        }
+
+        function handleForgotPassword() {
+            const email = prompt("Por favor, insira o seu email para receber o link de redefinição de senha.");
+            if (email) {
+                showModal("Email Enviado", `Se o email ${email} estiver registado, receberá um link para redefinir a sua senha.`);
+            }
+        }
+
+        function checkAuthState() {
+            const user = sessionStorage.getItem('loggedInUser');
+            if (user) {
+                loginScreen.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+                mainApp.classList.add('flex');
+                renderAll();
+            } else {
+                loginScreen.classList.remove('hidden');
+                mainApp.classList.add('hidden');
+                mainApp.classList.remove('flex');
+            }
+        }
+
         // --- LÓGICA DAS ABAS ---
         window.changeTab = function(tabName) {
             if (tabName === 'pdv' && !currentShift) {
@@ -294,10 +355,15 @@
             document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
             document.getElementById(`content-${tabName}`).classList.remove('hidden');
             document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            if (tabName === 'dashboard') renderDashboardTab();
+            if (tabName === 'reports') renderReportsTab();
+            if (tabName === 'customers') renderCustomersTab();
         }
         
         // --- RENDERIZAÇÃO GERAL E INICIALIZAÇÃO ---
         function renderAll() {
+            renderDashboardTab();
             renderCashRegisterTab();
             renderPdvTab();
             renderInventoryTab();
@@ -307,14 +373,44 @@
         }
 
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
+        function renderDashboardTab() {
+            const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
+            const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
+            const lowStockItems = products.filter(p => p.stock <= 2);
+            const totalDebt = customers.reduce((sum, c) => sum + c.debt, 0);
+
+            contentDashboard.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                        <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
+                        <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
+                        <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
+                    </div>
+                    <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                        <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
+                        <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
+                        <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
+                    </div>
+                    <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
+                        <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo (≤ 2 unidades)</h4>
+                        ${lowStockItems.length > 0 ? `
+                            <ul class="mt-2 space-y-1 text-sm">
+                                ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} un.</span></li>`).join('')}
+                            </ul>
+                        ` : '<p class="mt-4 text-center text-gray-500">Nenhum item com estoque baixo.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+        
         function renderCashRegisterTab() {
             const userOptions = users.map(user => `<option value="${user}">${user}</option>`).join('');
             let html = '';
 
-            if (!currentDay) { // Estado 1: Dia Fechado
+            if (!currentDay) {
                 html = `
                 <div class="text-center py-12">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-red-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-red-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
                     <h2 class="mt-4 text-2xl font-bold text-gray-800">Caixa Fechado</h2>
                     <form id="open-day-form" class="mt-6 max-w-sm mx-auto space-y-4">
                         <div>
@@ -328,14 +424,14 @@
                         <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg">Abrir Caixa (Iniciar Dia)</button>
                     </form>
                 </div>`;
-            } else if (currentDay && currentShift) { // Estado 2: Dia Aberto, Turno Ativo
+            } else if (currentDay && currentShift) {
                  html = `
                 <div class="text-center py-12">
                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-green-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 5-5 5 5 0 0 1 5 5v4"></path></svg>
                     <h2 class="mt-4 text-2xl font-bold text-gray-800">Turno Ativo</h2>
                     <div class="mt-4 text-gray-600 space-y-2">
-                        <p>Início do Turno: <span class="font-semibold">${formatDateTime(currentShift.startTime)}</span></p>
-                        <p>Operador do Turno: <span class="font-semibold">${currentShift.openedBy}</span></p>
+                        <p>Início do Turno: <span id="session-start-time" class="font-semibold"></span></p>
+                        <p>Operador do Turno: <span id="session-opened-by" class="font-semibold"></span></p>
                     </div>
                     <div class="mt-8 max-w-sm mx-auto">
                          <label for="closing-user" class="block text-sm font-medium text-gray-700">Operador de Fechamento</label>
@@ -343,7 +439,7 @@
                          <button id="close-shift-button" class="mt-4 w-full bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg">Fechar Turno</button>
                     </div>
                 </div>`;
-            } else { // Estado 3: Dia Aberto, Sem Turno Ativo
+            } else {
                 html = `
                 <div class="text-center py-12">
                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-blue-500"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v6l4 2"></path></svg>
@@ -362,7 +458,6 @@
                 </div>`;
             }
             contentCashRegister.innerHTML = html;
-            // Adicionar event listeners aos elementos recém-criados
             document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
             document.getElementById('close-shift-button')?.addEventListener('click', handleCloseShift);
             document.getElementById('open-shift-form')?.addEventListener('submit', handleOpenShift);
@@ -455,7 +550,13 @@
                         </form>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Contas a Receber</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-xl text-gray-700">Contas a Receber</h3>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500">Total em Dívidas</p>
+                                <p id="total-debt-summary" class="font-bold text-lg text-red-600"></p>
+                            </div>
+                        </div>
                         <div id="debtors-list" class="overflow-x-auto max-h-[60vh] overflow-y-auto">
                            <!-- Lista de devedores será inserida aqui -->
                         </div>
@@ -550,6 +651,8 @@
             if (!debtorsListEl) return;
             
             const debtors = customers.filter(c => c.id !== 1); // Exclui o cliente padrão
+            const totalDebt = debtors.reduce((sum, c) => sum + c.debt, 0);
+            document.getElementById('total-debt-summary').textContent = formatCurrency(totalDebt);
 
             if (debtors.length === 0) {
                 debtorsListEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum cliente cadastrado.</p>';
@@ -583,7 +686,6 @@
         }
         
         function openDebtPaymentModal(customerId) {
-            // CORREÇÃO: Adiciona verificação de turno ativo
             if (!currentShift) {
                 showModal('Caixa Fechado', 'É necessário abrir um turno para receber pagamentos de dívidas.');
                 return;
@@ -1057,18 +1159,31 @@
 
         // --- INICIALIZAÇÃO E EVENTOS ---
         document.addEventListener('DOMContentLoaded', () => {
-            renderAll();
+            loginForm.addEventListener('submit', handleLogin);
+            logoutButton.addEventListener('click', handleLogout);
+            forgotPasswordLink.addEventListener('click', handleForgotPassword);
             addPaymentForm.addEventListener('submit', handleAddPayment);
             confirmSaleButton.addEventListener('click', confirmSale);
-            document.getElementById('stop-scanner-button').addEventListener('click', stopInventoryScan);
-            document.getElementById('update-customer-button').addEventListener('click', handleUpdateCustomer);
-            document.getElementById('confirm-debt-payment-button').addEventListener('click', handleConfirmDebtPayment);
+            document.getElementById('stop-scanner-button')?.addEventListener('click', stopInventoryScan);
+            document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
+            document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
             paymentModal.addEventListener('click', (e) => {
                 if (e.target.classList.contains('payment-method-btn')) {
                     selectedPaymentMethod = e.target.dataset.method;
                     renderPaymentModal();
                 }
             });
+            debtPaymentModal.addEventListener('click', (e) => {
+                if (e.target.id === 'pay-full-debt-button') {
+                    const customerId = parseInt(document.getElementById('debt-customer-id').value);
+                    const customer = customers.find(c => c.id === customerId);
+                    if(customer) {
+                        document.getElementById('debt-payment-amount').value = customer.debt.toFixed(2);
+                    }
+                }
+            });
+
+            checkAuthState(); // Verifica o estado do login ao carregar a página
         });
     </script>
 </body>
