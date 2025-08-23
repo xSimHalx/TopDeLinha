@@ -268,14 +268,7 @@
       }
 
       // --- BASE DE DADOS INICIAL ---
-        let products = [
-            { sku: 'CAF-001', barcode: '789000000001', name: 'Café em Grãos 1kg', price: 45.50, stock: 5, minStock: 10 },
-            { sku: 'CHA-002', barcode: '789000000002', name: 'Chá Verde (Caixa)', price: 12.00, stock: 3, minStock: 15 },
-        ];
-        let customers = [
-            { id: 1, name: 'Cliente Padrão', cpf: '', phone: '', debt: 0 },
-            { id: 2, name: 'Maria da Silva', cpf: '111.222.333-44', phone: '(11) 98765-4321', debt: 75.50 },
-        ];
+
         const users = ['Ana', 'Bruno', 'Carla'];
         let cart = [];
         let closedDays = [];
@@ -336,7 +329,7 @@
         // CORREÇÃO: Usaremos uma simulação para evitar erros de chave de API durante o desenvolvimento.
         // Para usar o Firebase real, comente esta secção e descomente a secção "LÓGICA DE AUTENTICAÇÃO (FIREBASE REAL)" abaixo.
         
-        function handleLogin(event) {
+        /*function handleLogin(event) {
             event.preventDefault();
             const email = loginForm.email.value;
             const password = loginForm.password.value;
@@ -374,8 +367,8 @@
                 mainApp.classList.remove('flex');
             }
         }
+        */
         
-        /*
         // --- LÓGICA DE AUTENTICAÇÃO (FIREBASE REAL) ---
         // Para usar, comente a secção simulada acima e descomente esta.
         // Lembre-se de colocar as suas chaves reais na `firebaseConfig`.
@@ -422,7 +415,7 @@
                 mainApp.classList.remove('flex');
             }
         });
-        */
+        
 
 
         // --- LÓGICA DAS ABAS ---
