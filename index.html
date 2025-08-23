@@ -3,36 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caixa Top De Linha</title>
-
-   <script type="module">
-  // Importar as funções que REALMENTE vamos usar
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-
-  // A sua configuração (está perfeita como está)
-  const firebaseConfig = {
-    apiKey: "AIzaSy...", // Mantenha as suas chaves aqui
-    authDomain: "topdelinhacaixaestoque.firebaseapp.com",
-    projectId: "topdelinhacaixaestoque",
-    storageBucket: "topdelinhacaixaestoque.appspot.com",
-    messagingSenderId: "177632701767",
-    appId: "1:177632701767:web:ad38d9abb95a321d42b062"
-  };
-
-  // Iniciar o Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-
-  // Tornar tudo acessível para o nosso script principal
-  window.db = db;
-  window.fs = { collection, getDocs, addDoc, doc, updateDoc, deleteDoc };
-  window.auth = auth;
-  window.authFuncs = { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail };
-</script>
-
+    <title>Simulador de Caixa e Estoque v11.2 (Login Corrigido)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -78,9 +49,7 @@
             font-weight: 600;
         }
     </style>
-
 </head>
-
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
     <!-- Ecrã de Login -->
@@ -271,10 +240,38 @@
         </div>
     </div>
     
+    <script type="module">
+  // Importar as funções que REALMENTE vamos usar
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
+  // A sua configuração (está perfeita como está)
+  const firebaseConfig = {
+    apiKey: "AIzaSy...", // Mantenha as suas chaves aqui
+    authDomain: "topdelinhacaixaestoque.firebaseapp.com",
+    projectId: "topdelinhacaixaestoque",
+    storageBucket: "topdelinhacaixaestoque.appspot.com",
+    messagingSenderId: "177632701767",
+    appId: "1:177632701767:web:ad38d9abb95a321d42b062"
+  };
+
+  // Iniciar o Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  // Tornar tudo acessível para o nosso script principal
+  window.db = db;
+  window.fs = { collection, getDocs, addDoc, doc, updateDoc, deleteDoc };
+  window.auth = auth;
+  window.authFuncs = { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail };
+</script>
+
     <script>
         // --- BASE DE DADOS INICIAL ---
-        
-        const users = ['Ana', 'Bruno', 'Carla'];
+
+        const users = ['Edson', 'Edna'];
         let cart = [];
         let closedDays = [];
         let currentDay = null;
@@ -1201,8 +1198,8 @@
         }
 
         // --- INICIALIZAÇÃO E EVENTOS ---
-        
-            document.addEventListener('DOMContentLoaded', async () => {
+
+        document.addEventListener('DOMContentLoaded', async () => {
     // Primeiro, espera que os dados sejam carregados da nuvem
     await loadInitialData(); 
 
@@ -1213,6 +1210,7 @@
     addPaymentForm.addEventListener('submit', handleAddPayment);
     // ... etc
 });
+        
             debtPaymentModal.addEventListener('click', (e) => {
                 if (e.target.id === 'pay-full-debt-button') {
                     const customerId = parseInt(document.getElementById('debt-customer-id').value);
