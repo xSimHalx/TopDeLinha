@@ -248,7 +248,7 @@
 
   // A sua configuração (está perfeita como está)
   const firebaseConfig = {
-    apiKey: "AIzaSy...", // Mantenha as suas chaves aqui
+    apiKey: "AIzaSyD0aw5it4FgY7TdCIUrj9cGfGp3c0au10U",
     authDomain: "topdelinhacaixaestoque.firebaseapp.com",
     projectId: "topdelinhacaixaestoque",
     storageBucket: "topdelinhacaixaestoque.appspot.com",
@@ -320,6 +320,9 @@
         const debtPaymentModal = document.getElementById('debt-payment-modal');
         
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
+
+        
+
         const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -345,45 +348,53 @@
             document.getElementById('success-modal').classList.add('hidden');
         }
 
-        // --- LÓGICA DE AUTENTICAÇÃO SIMULADA ---
         function handleLogin(event) {
-            event.preventDefault();
-            const email = loginForm.email.value;
-            const password = loginForm.password.value;
-            
-            if (email === 'cliente@loja.com' && password === '123456') {
-                sessionStorage.setItem('loggedInUser', email);
-                checkAuthState();
-            } else {
-                showModal("Erro de Login", "Email ou senha incorretos. Por favor, tente novamente.");
-            }
-        }
+    event.preventDefault();
+    const email = loginForm.email.value;
+    const password = loginForm.password.value;
+    
+    authFuncs.signInWithEmailAndPassword(auth, email, password)
+        .catch(error => {
+            console.error("Erro de login:", error.code);
+            showModal("Erro de Login", "Email ou senha incorretos. Por favor, tente novamente.");
+        });
+}
 
-        function handleLogout() {
-            sessionStorage.removeItem('loggedInUser');
-            checkAuthState();
-        }
+function handleLogout() {
+    authFuncs.signOut(auth);
+}
 
-        function handleForgotPassword() {
-            const email = prompt("Por favor, insira o seu email para receber o link de redefinição de senha.");
-            if (email) {
-                showModal("Email Enviado", `Se o email ${email} estiver registado, receberá um link para redefinir a sua senha.`);
-            }
-        }
+function handleForgotPassword() {
+    const email = prompt("Por favor, insira o seu email para receber o link de redefinição de senha.");
+    if (email) {
+        authFuncs.sendPasswordResetEmail(auth, email)
+            .then(() => {
+                showModal("Email Enviado", "Um link para redefinir a sua senha foi enviado para o seu email.");
+            })
+            .catch(error => {
+                console.error("Erro ao enviar email:", error.code);
+                showModal("Erro", "Não foi possível enviar o email. Verifique se o endereço está correto.");
+            });
+    }
+}
 
-        function checkAuthState() {
-            const user = sessionStorage.getItem('loggedInUser');
-            if (user) {
-                loginScreen.classList.add('hidden');
-                mainApp.classList.remove('hidden');
-                mainApp.classList.add('flex');
-                renderAll();
-            } else {
-                loginScreen.classList.remove('hidden');
-                mainApp.classList.add('hidden');
-                mainApp.classList.remove('flex');
-            }
-        }
+// Observador principal do estado de autenticação
+authFuncs.onAuthStateChanged(auth, user => {
+    if (user) {
+        // Utilizador está logado
+        loginScreen.classList.add('hidden');
+        mainApp.classList.remove('hidden');
+        mainApp.classList.add('flex');
+        renderAll(); // Inicia o sistema
+    } else {
+        // Utilizador não está logado
+        loginScreen.classList.remove('hidden');
+        mainApp.classList.add('hidden');
+        mainApp.classList.remove('flex');
+    }
+});
+
+        
 
         // --- LÓGICA DAS ABAS ---
         window.changeTab = function(tabName) {
