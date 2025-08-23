@@ -4,10 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Caixa Top De Linha</title>
+
+   <script type="module">
+  // Importar as funções que REALMENTE vamos usar
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
+  // A sua configuração (está perfeita como está)
+  const firebaseConfig = {
+    apiKey: "AIzaSy...", // Mantenha as suas chaves aqui
+    authDomain: "topdelinhacaixaestoque.firebaseapp.com",
+    projectId: "topdelinhacaixaestoque",
+    storageBucket: "topdelinhacaixaestoque.appspot.com",
+    messagingSenderId: "177632701767",
+    appId: "1:177632701767:web:ad38d9abb95a321d42b062"
+  };
+
+  // Iniciar o Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  // Tornar tudo acessível para o nosso script principal
+  window.db = db;
+  window.fs = { collection, getDocs, addDoc, doc, updateDoc, deleteDoc };
+  window.auth = auth;
+  window.authFuncs = { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail };
+</script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -48,7 +78,9 @@
             font-weight: 600;
         }
     </style>
+
 </head>
+
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
     <!-- Ecrã de Login -->
@@ -241,14 +273,7 @@
     
     <script>
         // --- BASE DE DADOS INICIAL ---
-        let products = [
-            { sku: 'CAF-001', barcode: '789000000001', name: 'Café em Grãos 1kg', price: 45.50, stock: 5, minStock: 10 },
-            { sku: 'CHA-002', barcode: '789000000002', name: 'Chá Verde (Caixa)', price: 12.00, stock: 3, minStock: 15 },
-        ];
-        let customers = [
-            { id: 1, name: 'Cliente Padrão', cpf: '', phone: '', debt: 0 },
-            { id: 2, name: 'Maria da Silva', cpf: '111.222.333-44', phone: '(11) 98765-4321', debt: 75.50 },
-        ];
+        
         const users = ['Ana', 'Bruno', 'Carla'];
         let cart = [];
         let closedDays = [];
@@ -258,6 +283,24 @@
         let html5QrcodeScanner = null;
         let selectedPaymentMethod = 'Dinheiro';
         let salesChart = null;
+
+        async function loadInitialData() {
+    console.log("A procurar dados na base de dados...");
+
+    // Carregar produtos
+    const productsSnapshot = await fs.getDocs(fs.collection(db, "products"));
+    products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Carregar clientes
+    const customersSnapshot = await fs.getDocs(fs.collection(db, "customers"));
+    customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Carregar dias fechados (relatórios)
+    const daysSnapshot = await fs.getDocs(fs.collection(db, "closedDays"));
+    closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    console.log("Dados carregados!", { products, customers, closedDays });
+}
 
         // --- ELEMENTOS DO DOM ---
         const loginScreen = document.getElementById('login-screen');
@@ -1158,21 +1201,18 @@
         }
 
         // --- INICIALIZAÇÃO E EVENTOS ---
-        document.addEventListener('DOMContentLoaded', () => {
-            loginForm.addEventListener('submit', handleLogin);
-            logoutButton.addEventListener('click', handleLogout);
-            forgotPasswordLink.addEventListener('click', handleForgotPassword);
-            addPaymentForm.addEventListener('submit', handleAddPayment);
-            confirmSaleButton.addEventListener('click', confirmSale);
-            document.getElementById('stop-scanner-button')?.addEventListener('click', stopInventoryScan);
-            document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
-            document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
-            paymentModal.addEventListener('click', (e) => {
-                if (e.target.classList.contains('payment-method-btn')) {
-                    selectedPaymentMethod = e.target.dataset.method;
-                    renderPaymentModal();
-                }
-            });
+        
+            document.addEventListener('DOMContentLoaded', async () => {
+    // Primeiro, espera que os dados sejam carregados da nuvem
+    await loadInitialData(); 
+
+    // Só depois, desenha o ecrã com os dados reais
+    renderAll(); 
+
+    // O resto dos seus event listeners continuam aqui
+    addPaymentForm.addEventListener('submit', handleAddPayment);
+    // ... etc
+});
             debtPaymentModal.addEventListener('click', (e) => {
                 if (e.target.id === 'pay-full-debt-button') {
                     const customerId = parseInt(document.getElementById('debt-customer-id').value);
@@ -1184,7 +1224,7 @@
             });
 
             checkAuthState(); // Verifica o estado do login ao carregar a página
-        });
+        ;
     </script>
 </body>
 </html>
