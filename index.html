@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Caixa e Estoque v11.3 (Login Corrigido)</title>
+    <title>Simulador de Caixa e Estoque v11.3 (Versão Final Corrigida)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -249,12 +249,12 @@
       // IMPORTANTE: Substitua estas chaves pelas do seu projeto no site do Firebase!
       const firebaseConfig = {
         apiKey: "AIzaSyD0aw5it4FgY7TdCIUrj9cGfGp3c0au10U",
-    authDomain: "topdelinhacaixaestoque.firebaseapp.com",
-    projectId: "topdelinhacaixaestoque",
-    storageBucket: "topdelinhacaixaestoque.firebasestorage.app",
-    messagingSenderId: "177632701767",
-    appId: "1:177632701767:web:ad38d9abb95a321d42b062",
-    measurementId: "G-M0PEZ05LWE"
+        authDomain: "topdelinhacaixaestoque.firebaseapp.com",
+        projectId: "topdelinhacaixaestoque",
+        storageBucket: "topdelinhacaixaestoque.firebasestorage.app",
+        messagingSenderId: "177632701767",
+        appId: "1:177632701767:web:ad38d9abb95a321d42b062",
+        measurementId: "G-M0PEZ05LWE"
       };
 
       // --- INICIALIZAÇÃO DO FIREBASE ---
@@ -268,9 +268,10 @@
         //alert("Erro de configuração. Verifique as chaves do Firebase no código.");
       }
 
-      // --- BASE DE DADOS INICIAL ---
-    
-        const users = ['Edson', 'Edna'];
+      // --- BASE DE DADOS (Agora serão carregados do Firebase) ---
+        let products = [];
+        let customers = [];
+        const users = ['Ana', 'Bruno', 'Carla'];
         let cart = [];
         let closedDays = [];
         let currentDay = null;
@@ -326,54 +327,7 @@
             document.getElementById('success-modal').classList.add('hidden');
         }
 
-        // --- LÓGICA DE AUTENTICAÇÃO (SIMULADA) ---
-        // CORREÇÃO: Usaremos uma simulação para evitar erros de chave de API durante o desenvolvimento.
-        // Para usar o Firebase real, comente esta secção e descomente a secção "LÓGICA DE AUTENTICAÇÃO (FIREBASE REAL)" abaixo.
-        
-        /*function handleLogin(event) {
-            event.preventDefault();
-            const email = loginForm.email.value;
-            const password = loginForm.password.value;
-            
-            if (email === 'cliente@loja.com' && password === '123456') {
-                sessionStorage.setItem('loggedInUser', email);
-                checkAuthState();
-            } else {
-                showModal("Erro de Login", "Email ou senha incorretos. Por favor, tente novamente.");
-            }
-        }
-
-        function handleLogout() {
-            sessionStorage.removeItem('loggedInUser');
-            checkAuthState();
-        }
-
-        function handleForgotPassword() {
-            const email = prompt("Por favor, insira o seu email para receber o link de redefinição de senha.");
-            if (email) {
-                showModal("Email Enviado", `Se o email ${email} estiver registado, receberá um link para redefinir a sua senha.`);
-            }
-        }
-
-        function checkAuthState() {
-            const user = sessionStorage.getItem('loggedInUser');
-            if (user) {
-                loginScreen.classList.add('hidden');
-                mainApp.classList.remove('hidden');
-                mainApp.classList.add('flex');
-                renderAll();
-            } else {
-                loginScreen.classList.remove('hidden');
-                mainApp.classList.add('hidden');
-                mainApp.classList.remove('flex');
-            }
-        }
-    */
-        
         // --- LÓGICA DE AUTENTICAÇÃO (FIREBASE REAL) ---
-        // Para usar, comente a secção simulada acima e descomente esta.
-        // Lembre-se de colocar as suas chaves reais na `firebaseConfig`.
-
         function handleLogin(event) {
             event.preventDefault();
             const email = loginForm.email.value;
@@ -404,11 +358,12 @@
             }
         }
 
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 loginScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
                 mainApp.classList.add('flex');
+                await loadInitialData(); // Carrega os dados APÓS o login
                 renderAll();
             } else {
                 loginScreen.classList.remove('hidden');
@@ -416,7 +371,6 @@
                 mainApp.classList.remove('flex');
             }
         });
-    
 
 
         // --- LÓGICA DAS ABAS ---
@@ -444,6 +398,26 @@
             renderCustomersTab();
             renderReportsTab();
             updateCashRegisterStatus();
+        }
+
+        // --- CARREGAMENTO DE DADOS ---
+        async function loadInitialData() {
+            console.log("A procurar dados na base de dados...");
+            try {
+                const productsSnapshot = await getDocs(collection(db, "products"));
+                products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const customersSnapshot = await getDocs(collection(db, "customers"));
+                customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                const daysSnapshot = await getDocs(collection(db, "closedDays"));
+                closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                console.log("Dados carregados!", { products, customers, closedDays });
+            } catch (error) {
+                console.error("Erro ao carregar dados iniciais:", error);
+                showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
+            }
         }
 
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
