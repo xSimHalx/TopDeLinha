@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Caixa e Estoque v11.3 (Versão Final Corrigida)</title>
+    <title>Simulador de Caixa e Estoque v11.4 (Login Final Corrigido)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -271,7 +271,7 @@
       // --- BASE DE DADOS (Agora serão carregados do Firebase) ---
         let products = [];
         let customers = [];
-        const users = ['Ana', 'Bruno', 'Carla'];
+        const users = ['Edson', 'Edna'];
         let cart = [];
         let closedDays = [];
         let currentDay = null;
@@ -1231,7 +1231,18 @@
                 }
             });
 
-            checkAuthState(); // Verifica o estado do login ao carregar a página
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    loginScreen.classList.add('hidden');
+                    mainApp.classList.remove('hidden');
+                    mainApp.classList.add('flex');
+                    renderAll();
+                } else {
+                    loginScreen.classList.remove('hidden');
+                    mainApp.classList.add('hidden');
+                    mainApp.classList.remove('flex');
+                }
+            });
         });
     </script>
 </body>
