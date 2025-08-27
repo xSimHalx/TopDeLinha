@@ -550,12 +550,15 @@
                     <div>
                         <div class="mb-8">
                             <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
-                            <div class="bg-gray-50 p-6 rounded-lg text-center">
-                                <p class="text-gray-600 mb-4">Use a câmera do celular para cadastrar ou adicionar estoque a um item rapidamente.</p>
+                            <div class="bg-gray-50 p-6 rounded-lg">
+                                <p class="text-gray-600 mb-4 text-center">Use a câmera para escanear o código de barras:</p>
                                 <button id="scan-inventory-button" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M3 6h18"/><path d="M3 10h18"/><path d="M3 14h18"/><path d="M3 18h18"/></svg>
                                     Escanear com a Câmera
                                 </button>
+                                <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
+                                <input type="text" id="inventory-search-input" onkeyup="handleInventorySearch(event)" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
+                                <div id="inventory-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
                             </div>
                         </div>
                         <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-6">Adicionar Novo Produto (Manual)</h3>
@@ -579,10 +582,51 @@
                         </div>
                     </div>
                 </div>
-            `;
+            `
             document.getElementById('add-product-form').addEventListener('submit', handleAddProduct);
             document.getElementById('scan-inventory-button').addEventListener('click', startInventoryScan);
             renderInventoryManagement();
+        }
+
+        window.handleInventorySearch = function(event) {
+            const searchTerm = event.target.value.toLowerCase();
+            const resultsContainer = document.getElementById('inventory-search-results');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm));
+
+            if (filteredProducts.length > 0) {
+                resultsContainer.innerHTML = filteredProducts.map(p => `
+                    <div onclick="addProductStockFromSearch('${p.id}')" class="p-2 border-b hover:bg-gray-100 cursor-pointer">
+                        <p class="font-semibold">${p.name}</p>
+                        <p class="text-sm text-gray-500">Estoque atual: ${p.stock}</p>
+                    </div>
+                `).join('');
+            } else {
+                resultsContainer.innerHTML = '<p class="p-2 text-gray-500">Nenhum produto encontrado.</p>';
+            }
+        }
+
+        window.addProductStockFromSearch = async function(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+            const quantity = parseInt(quantityStr);
+
+            if (!isNaN(quantity) && quantity > 0) {
+                await updateProductStock(product.id, quantity);
+            } else if (quantityStr !== null) {
+                showModal('Erro', 'Quantidade inválida.');
+            }
+            
+            // Clear search
+            document.getElementById('inventory-search-input').value = '';
+            document.getElementById('inventory-search-results').innerHTML = '';
         }
 
         function renderCustomersTab() {
