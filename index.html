@@ -1058,25 +1058,42 @@
             });
         }
         
-        function handleAddProduct(event) {
-            event.preventDefault();
-            const sku = document.getElementById('new-sku').value.trim();
-            const barcode = document.getElementById('new-barcode').value.trim();
-            const name = document.getElementById('new-name').value.trim();
-            const price = parseFloat(document.getElementById('new-price').value);
-            const stock = parseInt(document.getElementById('new-stock').value);
-            const minStock = parseInt(document.getElementById('new-min-stock').value);
+        async function handleAddProduct(event) {
+    event.preventDefault();
+    const sku = document.getElementById('new-sku').value.trim();
+    const barcode = document.getElementById('new-barcode').value.trim();
+    const name = document.getElementById('new-name').value.trim();
+    const price = parseFloat(document.getElementById('new-price').value);
+    const stock = parseInt(document.getElementById('new-stock').value);
+    const minStock = parseInt(document.getElementById('new-min-stock').value);
 
-            if(!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
-                showModal('Erro', 'Preencha todos os campos obrigatórios.');
-                return;
-            }
+    if(!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
+        showModal('Erro', 'Preencha todos os campos obrigatórios.');
+        return;
+    }
 
-            products.push({ sku, barcode, name, price, stock, minStock });
-            renderInventoryManagement();
-            document.getElementById('add-product-form').reset();
-            showModal('Sucesso', 'Produto adicionado.');
-        }
+    const newProduct = { sku, barcode, name, price, stock, minStock };
+
+    try {
+        // A "magia" acontece aqui:
+        // 1. Dizemos para adicionar um novo "documento" (o nosso produto)...
+        // 2. ... na "coleção" (gaveta) chamada "products".
+        await addDoc(collection(db, "products"), newProduct);
+
+        showModal('Sucesso!', 'Produto adicionado à base de dados.');
+        document.getElementById('add-product-form').reset();
+        
+        // Recarrega os dados da nuvem para mostrar a lista atualizada
+        await loadInitialData(); 
+        renderInventoryManagement(); // Redesenha a tabela de stock
+
+    } catch (error) {
+        console.error("Erro ao adicionar produto:", error);
+        showModal('Erro de Base de Dados', 'Não foi possível guardar o produto.');
+    }
+}
+
+        
 
         function startInventoryScan() {
             scannerModal.classList.remove('hidden');
