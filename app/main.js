@@ -239,8 +239,8 @@ function handleAddPayment(event) {
     renderPaymentModal();
 }
 
-function confirmSale() {
-    const customerId = parseInt(document.getElementById('payment-modal-customer-select').value);
+async function confirmSale() {
+    const customerId = document.getElementById('payment-modal-customer-select').value;
     saleInProgress.customerId = customerId;
 
     if (selectedPaymentMethod === 'Fiado') {
@@ -249,24 +249,27 @@ function confirmSale() {
             return;
         }
         const customer = customers.find(c => c.id === customerId);
-        customer.debt += saleInProgress.total;
+        const newDebt = customer.debt + saleInProgress.total;
+        await updateCustomer(customerId, { debt: newDebt });
         saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
     }
 
     saleInProgress.id = (currentShift.sales.length + 1);
     saleInProgress.date = new Date();
     currentShift.sales.push(saleInProgress);
+    await updateDay(currentDay.id, { shifts: currentDay.shifts });
 
     const lowStockItems = [];
-    saleInProgress.items.forEach(cartItem => {
+    for (const cartItem of saleInProgress.items) {
         const productInDb = products.find(p => p.sku === cartItem.sku);
         if (productInDb) {
-            productInDb.stock -= cartItem.quantity;
-            if (productInDb.stock <= 2) {
+            const newStock = productInDb.stock - cartItem.quantity;
+            await updateProductStock(productInDb.id, newStock);
+            if (newStock <= 2) {
                 lowStockItems.push(productInDb.name);
             }
         }
-    });
+    }
     
     const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
     const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
