@@ -1,0 +1,40 @@
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-color: #4f46e5; /* indigo-600 */
+            background-color: #eef2ff; /* indigo-50 */
+            color: #4338ca; /* indigo-700 */
+            font-weight: 600;
+        }
+        .tab-button:disabled {
+            color: #9ca3af;
+            border-color: transparent;
+            cursor: not-allowed;
+        }
+        .low-stock-row {
+            background-color: #fef2f2; /* red-50 */
+        }
+        .low-stock-text {
+            color: #b91c1c; /* red-700 */
+            font-weight: bold;
+        }
+        #reader {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+        .payment-method-btn {
+            border: 2px solid #d1d5db;
+            transition: all 0.2s ease;
+        }
+        .payment-method-btn.active {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+            color: #4338ca;
+            font-weight: 600;
+        }
+    
