@@ -58,10 +58,11 @@
         const scannerModal = document.getElementById('scanner-modal');
         const editCustomerModal = document.getElementById('edit-customer-modal');
         const debtPaymentModal = document.getElementById('debt-payment-modal');
+        const receiptModal = document.getElementById('receipt-modal');
         
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
         const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const formatDateTime = (date) => date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
         window.showModal = function(title, message, warningMessage = '') {
             const modal = document.getElementById('success-modal');
@@ -160,7 +161,6 @@
 
         // --- CARREGAMENTO DE DADOS ---
         async function loadInitialData() {
-            // console.log("A procurar dados na base de dados..."); // Removed console.log
             try {
                 const productsSnapshot = await getDocs(collection(db, "products"));
                 products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -171,8 +171,6 @@
                 const daysSnapshot = await getDocs(collection(db, "closedDays"));
                 closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // console.log("Dados carregados!", { products, customers, closedDays }); // Removed console.log
-                // console.log('Produtos carregados:', products); // Removed console.log
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
                 showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
@@ -184,7 +182,7 @@
             const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
             const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
             const lowStockItems = products.filter(p => p.stock <= 2);
-            const totalDebt = customers.reduce((sum, c) => sum + c.debt, 0);
+            const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
 
             contentDashboard.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -217,7 +215,6 @@
             const cashRegisterActiveShiftState = document.getElementById('cash-register-active-shift-state');
             const cashRegisterWaitingShiftState = document.getElementById('cash-register-waiting-shift-state');
 
-            // Hide all states initially
             cashRegisterClosedState.classList.add('hidden');
             cashRegisterActiveShiftState.classList.add('hidden');
             cashRegisterWaitingShiftState.classList.add('hidden');
@@ -261,7 +258,6 @@
                     </div>
                 </div>
             `;
-            // Event listeners are now handled by delegation in DOMContentLoaded
             renderProductList();
             renderCart();
         }
@@ -305,7 +301,6 @@
                     </div>
                 </div>
             `;
-            // Event listeners are now handled by delegation in DOMContentLoaded
             renderInventoryManagement();
         }
 
@@ -336,10 +331,7 @@
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}
-Estoque atual: ${product.stock}
-
-Qual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -348,7 +340,6 @@ Qual a quantidade a adicionar?`);
                 showModal('Erro', 'Quantidade inválida.');
             }
             
-            // Clear search
             document.getElementById('inventory-search-input').value = '';
             document.getElementById('inventory-search-results').innerHTML = '';
         }
@@ -374,12 +365,10 @@ Qual a quantidade a adicionar?`);
                             </div>
                         </div>
                         <div id="debtors-list" class="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                           <!-- Lista de devedores será inserida aqui -->
                         </div>
                     </div>
                 </div>
             `;
-            // Event listeners are now handled by delegation in DOMContentLoaded
             renderDebtorsList();
         }
         
@@ -446,7 +435,7 @@ Qual a quantidade a adicionar?`);
         }
 
         // --- LÓGICA DE CLIENTES E FIADO ---
-        async function handleAddCustomer(event) { // Added async
+        async function handleAddCustomer(event) { 
             event.preventDefault();
             const name = document.getElementById('new-customer-name').value.trim();
             const phone = document.getElementById('new-customer-phone').value.trim();
@@ -455,11 +444,10 @@ Qual a quantidade a adicionar?`);
                 showModal('Erro', 'O nome do cliente é obrigatório.');
                 return;
             }
-            // Changed to use Firestore addDoc
             const newCustomer = { name, phone, debt };
             try {
                 await addDoc(collection(db, "customers"), newCustomer);
-                await loadInitialData(); // Reload customers to get the Firestore-generated ID
+                await loadInitialData(); 
                 renderDebtorsList();
                 document.getElementById('add-customer-form').reset();
                 showModal('Sucesso!', 'Novo cliente cadastrado.');
@@ -474,7 +462,7 @@ Qual a quantidade a adicionar?`);
             if (!debtorsListEl) return;
             
             const debtors = customers.filter(c => c.id !== 1); // Exclui o cliente padrão
-            const totalDebt = debtors.reduce((sum, c) => sum + c.debt, 0);
+            const totalDebt = debtors.reduce((sum, c) => sum + (c.debt || 0), 0);
             document.getElementById('total-debt-summary').textContent = formatCurrency(totalDebt);
 
             if (debtors.length === 0) {
@@ -496,10 +484,10 @@ Qual a quantidade a adicionar?`);
                                     <p class="font-semibold">${c.name}</p>
                                     <p class="text-xs text-gray-500">${c.phone || ''}</p>
                                 </td>
-                                <td class="p-3 font-bold ${c.debt > 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(c.debt)}</td>
+                                <td class="p-3 font-bold ${c.debt > 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(c.debt || 0)}</td>
                                 <td class="p-3 text-center space-x-2">
-                                    <button onclick="openDebtPaymentModal(${c.id})" class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200">Receber</button>
-                                    <button onclick="openEditCustomerModal(${c.id})" class="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-gray-200">Editar</button>
+                                    <button onclick="openDebtPaymentModal('${c.id}')" class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200">Receber</button>
+                                    <button onclick="openEditCustomerModal('${c.id}')" class="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-gray-200">Editar</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -516,16 +504,16 @@ Qual a quantidade a adicionar?`);
 
             const customer = customers.find(c => c.id === customerId);
             if (!customer) return;
-            if (customer.debt <= 0) {
+            if ((customer.debt || 0) <= 0) {
                 showModal('Informação', 'Este cliente não possui dívidas.');
                 return;
             }
 
             document.getElementById('debt-customer-id').value = customer.id;
             document.getElementById('debt-customer-name').textContent = customer.name;
-            document.getElementById('debt-customer-current-debt').textContent = formatCurrency(customer.debt);
-            document.getElementById('debt-payment-amount').max = customer.debt;
-            document.getElementById('debt-payment-amount').value = customer.debt.toFixed(2);
+            document.getElementById('debt-customer-current-debt').textContent = formatCurrency(customer.debt || 0);
+            document.getElementById('debt-payment-amount').max = customer.debt || 0;
+            document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2);
             
             debtPaymentModal.classList.remove('hidden');
         }
@@ -534,28 +522,34 @@ Qual a quantidade a adicionar?`);
             debtPaymentModal.classList.add('hidden');
         }
 
-        function handleConfirmDebtPayment() {
-            const customerId = parseInt(document.getElementById('debt-customer-id').value);
-            const customer = customers.find(c => c.id === customerId);
-            if (!customer) return;
+        async function handleConfirmDebtPayment() {
+            const customerId = document.getElementById('debt-customer-id').value;
+            const customerRef = doc(db, "customers", customerId);
 
             const amount = parseFloat(document.getElementById('debt-payment-amount').value);
             const method = document.getElementById('debt-payment-method').value;
 
-            if (isNaN(amount) || amount <= 0 || amount > customer.debt) {
+            const customer = customers.find(c => c.id === customerId);
+            if (!customer || isNaN(amount) || amount <= 0 || amount > (customer.debt || 0)) {
                 showModal('Erro', 'Valor de pagamento inválido.');
                 return;
             }
 
-            customer.debt -= amount;
-            
-            if (currentShift) {
-                currentShift.debtPayments.push({ customerId, customerName: customer.name, amount, method });
-            }
+            const newDebt = (customer.debt || 0) - amount;
 
-            renderDebtorsList();
-            closeDebtPaymentModal();
-            showModal('Pagamento Recebido', `${formatCurrency(amount)} foram abatidos da dívida de ${customer.name}.`);
+            try {
+                await updateDoc(customerRef, { debt: newDebt });
+                if (currentShift) {
+                    currentShift.debtPayments.push({ customerId, customerName: customer.name, amount, method });
+                }
+                await loadInitialData();
+                renderDebtorsList();
+                closeDebtPaymentModal();
+                showModal('Pagamento Recebido', `${formatCurrency(amount)} foram abatidos da dívida de ${customer.name}.`);
+            } catch (error) {
+                console.error("Erro ao atualizar dívida:", error);
+                showModal("Erro de Base de Dados", "Não foi possível atualizar a dívida do cliente.");
+            }
         }
 
         window.openEditCustomerModal = function(customerId) {
@@ -565,7 +559,7 @@ Qual a quantidade a adicionar?`);
             document.getElementById('edit-customer-id').value = customer.id;
             document.getElementById('edit-customer-name').value = customer.name;
             document.getElementById('edit-customer-phone').value = customer.phone || '';
-            document.getElementById('edit-customer-debt').value = customer.debt.toFixed(2);
+            document.getElementById('edit-customer-debt').value = (customer.debt || 0).toFixed(2);
             
             editCustomerModal.classList.remove('hidden');
         }
@@ -574,18 +568,24 @@ Qual a quantidade a adicionar?`);
             editCustomerModal.classList.add('hidden');
         }
 
-        function handleUpdateCustomer() {
-            const id = parseInt(document.getElementById('edit-customer-id').value);
-            const customer = customers.find(c => c.id === id);
-            if (!customer) return;
+        async function handleUpdateCustomer() {
+            const customerId = document.getElementById('edit-customer-id').value;
+            const customerRef = doc(db, "customers", customerId);
 
-            customer.name = document.getElementById('edit-customer-name').value.trim();
-            customer.phone = document.getElementById('edit-customer-phone').value.trim();
-            customer.debt = parseFloat(document.getElementById('edit-customer-debt').value) || 0;
+            const name = document.getElementById('edit-customer-name').value.trim();
+            const phone = document.getElementById('edit-customer-phone').value.trim();
+            const debt = parseFloat(document.getElementById('edit-customer-debt').value) || 0;
 
-            renderDebtorsList();
-            closeEditCustomerModal();
-            showModal('Sucesso', 'Dados do cliente atualizados.');
+            try {
+                await updateDoc(customerRef, { name, phone, debt });
+                await loadInitialData();
+                renderDebtorsList();
+                closeEditCustomerModal();
+                showModal('Sucesso', 'Dados do cliente atualizados.');
+            } catch (error) {
+                console.error("Erro ao atualizar cliente:", error);
+                showModal("Erro de Base de Dados", "Não foi possível atualizar os dados do cliente.");
+            }
         }
 
 
@@ -612,9 +612,7 @@ Qual a quantidade a adicionar?`);
         }
         
         function handleBarcodeScan(scannedCode) {
-            // console.log('Código escaneado:', scannedCode); // Removed console.log
             const product = products.find(p => p.barcode === scannedCode);
-            // console.log('Produto encontrado (handleBarcodeScan):', product); // Removed console.log
             if (product) {
                 addToCart(product.sku);
             } else {
@@ -622,7 +620,7 @@ Qual a quantidade a adicionar?`);
             }
         }
 
-        window.addToCart = function(sku) {
+        function addToCart(sku) {
             const product = products.find(p => p.sku === sku);
 
             if (!product) {
@@ -649,7 +647,7 @@ Qual a quantidade a adicionar?`);
             const cartItemsEl = document.getElementById('cart-items');
             const checkoutButton = document.getElementById('checkout-button');
             const cartTotalEl = document.getElementById('cart-total');
-            if(!cartItemsEl || !checkoutButton || !cartTotalEl) return; // Guard clause
+            if(!cartItemsEl || !checkoutButton || !cartTotalEl) return;
             if (cart.length === 0) {
                 cartItemsEl.innerHTML = '<p class="text-gray-500 text-center pt-16">Carrinho vazio.</p>';
                 checkoutButton.disabled = true;
@@ -696,7 +694,7 @@ Qual a quantidade a adicionar?`);
                 payments: [],
                 customerId: 1,
             };
-            selectedPaymentMethod = 'Dinheiro'; // Reseta para o padrão
+            selectedPaymentMethod = 'Dinheiro';
             renderPaymentModal();
             paymentModal.classList.remove('hidden');
             setTimeout(() => paymentModal.querySelector('div').classList.add('scale-100'), 10);
@@ -724,7 +722,7 @@ Qual a quantidade a adicionar?`);
             
             let saleCanBeConfirmed = false;
             if (selectedPaymentMethod === 'Fiado') {
-                saleCanBeConfirmed = customerId !== 1; // Não pode ser cliente padrão
+                saleCanBeConfirmed = customerId !== 1;
             } else {
                 saleCanBeConfirmed = totalPaid >= total;
             }
@@ -756,52 +754,85 @@ Qual a quantidade a adicionar?`);
             setTimeout(() => paymentModal.classList.add('hidden'), 200);
         }
 
-        function confirmSale() {
-            const customerId = parseInt(document.getElementById('payment-modal-customer-select').value);
+        async function confirmSale() {
+            const customerId = document.getElementById('payment-modal-customer-select').value;
             saleInProgress.customerId = customerId;
 
             if (selectedPaymentMethod === 'Fiado') {
-                if (customerId === 1) {
+                if (customerId === "1") {
                     showModal('Ação Inválida', 'Selecione um cliente cadastrado para vendas a fiado.');
                     return;
                 }
+                const customerRef = doc(db, "customers", customerId);
                 const customer = customers.find(c => c.id === customerId);
-                customer.debt += saleInProgress.total;
+                const newDebt = (customer.debt || 0) + saleInProgress.total;
+                await updateDoc(customerRef, { debt: newDebt });
                 saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
             }
 
             saleInProgress.id = (currentShift.sales.length + 1);
-            saleInProgress.date = new Date();
+            saleInProgress.date = new Date().toISOString();
             currentShift.sales.push(saleInProgress);
 
-            const lowStockItems = [];
-            saleInProgress.items.forEach(cartItem => {
-                const productInDb = products.find(p => p.sku === cartItem.sku);
-                if (productInDb) {
-                    productInDb.stock -= cartItem.quantity;
-                    if (productInDb.stock <= 2) {
-                        lowStockItems.push(productInDb.name);
-                    }
-                }
-            });
+            // Update stock in Firestore
+            for(const cartItem of saleInProgress.items) {
+                const productRef = doc(db, "products", cartItem.id);
+                const newStock = cartItem.stock - cartItem.quantity;
+                await updateDoc(productRef, { stock: newStock });
+            }
             
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
             const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
 
+            await loadInitialData();
             renderAll();
             resetPdv();
             closePaymentModal();
             
-            let mainMessage = `Venda Confirmada! Troco: ${formatCurrency(change)}`;
-            if (selectedPaymentMethod === 'Fiado') {
-                mainMessage = `Venda adicionada à conta de ${customers.find(c => c.id === customerId).name}.`;
-            }
+            renderReceipt(saleInProgress, change);
+        }
+
+        function renderReceipt(saleData, change) {
+            document.getElementById('receipt-date').textContent = formatDateTime(saleData.date);
+            document.getElementById('receipt-sale-id').textContent = saleData.id;
+            document.getElementById('receipt-shift-id').textContent = currentShift.id;
             
-            let warningMessage = '';
-            if (lowStockItems.length > 0) {
-                warningMessage = `Estoque baixo para: ${lowStockItems.join(', ')}`;
-            }
-            showModal('Sucesso!', mainMessage, warningMessage);
+            const customer = customers.find(c => c.id === saleData.customerId);
+            document.getElementById('receipt-customer').textContent = customer ? customer.name : 'Consumidor Final';
+
+            const itemsEl = document.getElementById('receipt-items');
+            itemsEl.innerHTML = '';
+            saleData.items.forEach(item => {
+                const itemHTML = `
+                    <div>
+                        <p>${item.quantity}x ${item.name}</p>
+                        <p class="text-right">${formatCurrency(item.price * item.quantity)}</p>
+                    </div>
+                `;
+                itemsEl.innerHTML += itemHTML;
+            });
+
+            document.getElementById('receipt-total').textContent = formatCurrency(saleData.total);
+            
+            const paymentsEl = document.getElementById('receipt-payments');
+            paymentsEl.innerHTML = '';
+            saleData.payments.forEach(p => {
+                paymentsEl.innerHTML += `<p>${p.method}: <span>${formatCurrency(p.amount)}</span></p>`;
+            });
+
+            document.getElementById('receipt-change').textContent = formatCurrency(change);
+
+            receiptModal.classList.remove('hidden');
+            receiptModal.querySelector('div').classList.add('scale-100');
+        }
+
+        function printReceipt() {
+            window.print();
+        }
+
+        function closeReceiptModal() {
+            receiptModal.querySelector('div').classList.remove('scale-100');
+            setTimeout(() => receiptModal.classList.add('hidden'), 200);
         }
 
         // --- OUTRAS LÓGICAS ---
@@ -811,11 +842,24 @@ Qual a quantidade a adicionar?`);
             productListEl.innerHTML = '';
             products.forEach(product => {
                 const productInStock = product.stock > 0;
-                productListEl.innerHTML += `
-                    <div class="border rounded-lg p-3 flex flex-col justify-between ${!productInStock ? 'bg-gray-100 opacity-60' : 'bg-white'}">
-                        <div><p class="font-bold">${product.name}</p><p class="text-gray-600">${formatCurrency(product.price)}</p></div>
-                        <button onclick="addToCart('${product.sku}')" class="mt-3 w-full text-sm font-bold py-2 rounded-md ${productInStock ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-300 cursor-not-allowed'}" ${!productInStock ? 'disabled' : ''}>Add</button>
-                    </div>`;
+                const productDiv = document.createElement('div');
+                productDiv.className = `border rounded-lg p-3 flex flex-col justify-between ${!productInStock ? 'bg-gray-100 opacity-60' : 'bg-white'}`;
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.innerHTML = `<p class="font-bold">${product.name}</p><p class="text-gray-600">${formatCurrency(product.price)}</p>`;
+                
+                const addButton = document.createElement('button');
+                addButton.textContent = 'Add';
+                addButton.className = `mt-3 w-full text-sm font-bold py-2 rounded-md ${productInStock ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-300 cursor-not-allowed'}`;
+                addButton.disabled = !productInStock;
+                
+                if(productInStock) {
+                    addButton.addEventListener('click', () => addToCart(product.sku));
+                }
+
+                productDiv.appendChild(infoDiv);
+                productDiv.appendChild(addButton);
+                productListEl.appendChild(productDiv);
             });
         }
         
@@ -825,17 +869,17 @@ Qual a quantidade a adicionar?`);
             inventoryManagementTableBodyEl.innerHTML = '';
 
             const sortedProducts = [...products].sort((a, b) => {
-                const aIsLow = a.stock <= 2;
-                const bIsLow = b.stock <= 2;
+                const aIsLow = a.stock <= a.minStock;
+                const bIsLow = b.stock <= b.minStock;
                 if (aIsLow && !bIsLow) return -1;
                 if (!aIsLow && bIsLow) return 1;
-                return 0;
+                return a.name.localeCompare(b.name);
             });
 
             sortedProducts.forEach(product => {
-                const isLowStock = product.stock <= 2;
-                const rowClass = isLowStock ? 'low-stock-row' : '';
-                const textClass = isLowStock ? 'low-stock-text' : '';
+                const isLowStock = product.stock <= product.minStock;
+                const rowClass = isLowStock ? 'bg-red-50' : '';
+                const textClass = isLowStock ? 'text-red-600 font-bold' : '';
 
                 inventoryManagementTableBodyEl.innerHTML += `
                     <tr class="${rowClass}">
@@ -847,39 +891,32 @@ Qual a quantidade a adicionar?`);
         }
         
         async function handleAddProduct(event) {
-    event.preventDefault();
-    const sku = document.getElementById('new-sku').value.trim();
-    const barcode = document.getElementById('new-barcode').value.trim();
-    const name = document.getElementById('new-name').value.trim();
-    const price = parseFloat(document.getElementById('new-price').value);
-    const stock = parseInt(document.getElementById('new-stock').value);
-    const minStock = parseInt(document.getElementById('new-min-stock').value);
+            event.preventDefault();
+            const sku = document.getElementById('new-sku').value.trim();
+            const barcode = document.getElementById('new-barcode').value.trim();
+            const name = document.getElementById('new-name').value.trim();
+            const price = parseFloat(document.getElementById('new-price').value);
+            const stock = parseInt(document.getElementById('new-stock').value);
+            const minStock = parseInt(document.getElementById('new-min-stock').value);
 
-    if(!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
-        showModal('Erro', 'Preencha todos os campos obrigatórios.');
-        return;
-    }
+            if(!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
+                showModal('Erro', 'Preencha todos os campos obrigatórios.');
+                return;
+            }
 
-    const newProduct = { sku, barcode, name, price, stock, minStock };
+            const newProduct = { sku, barcode, name, price, stock, minStock };
 
-    try {
-        // A "magia" acontece aqui:
-        // 1. Dizemos para adicionar um novo "documento" (o nosso produto)...
-        // 2. ... na "coleção" (gaveta) chamada "products".
-        await addDoc(collection(db, "products"), newProduct);
-
-        showModal('Sucesso!', 'Produto adicionado à base de dados.');
-        document.getElementById('add-product-form').reset();
-        
-        // Recarrega os dados da nuvem para mostrar a lista atualizada
-        await loadInitialData(); 
-        renderInventoryManagement(); // Redesenha a tabela de stock
-
-    } catch (error) {
-        console.error("Erro ao adicionar produto:", error);
-        showModal('Erro de Base de Dados', 'Não foi possível guardar o produto.');
-    }
-}
+            try {
+                await addDoc(collection(db, "products"), newProduct);
+                showModal('Sucesso!', 'Produto adicionado à base de dados.');
+                document.getElementById('add-product-form').reset();
+                await loadInitialData(); 
+                renderInventoryManagement();
+            } catch (error) {
+                console.error("Erro ao adicionar produto:", error);
+                showModal('Erro de Base de Dados', 'Não foi possível guardar o produto.');
+            }
+        }
 
         async function updateProductStock(productId, quantityToAdd) {
             try {
@@ -889,7 +926,6 @@ Qual a quantidade a adicionar?`);
                     const newStock = product.stock + quantityToAdd;
                     await updateDoc(productRef, { stock: newStock });
                     
-                    // Update local data and re-render
                     await loadInitialData();
                     renderInventoryManagement();
                     showModal('Sucesso', `${quantityToAdd} unidades de ${product.name} adicionadas ao estoque.`);
@@ -899,8 +935,6 @@ Qual a quantidade a adicionar?`);
                 showModal('Erro de Base de Dados', 'Não foi possível atualizar o estoque do produto.');
             }
         }
-
-        
 
         function startInventoryScan() {
             scannerModal.classList.remove('hidden');
@@ -941,7 +975,6 @@ Qual a quantidade a adicionar?`);
                 }
             } else {
                 if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
-                    renderInventoryTab();
                     changeTab('inventory');
                     document.getElementById('new-barcode').value = barcode.trim();
                     document.getElementById('new-sku').focus();
@@ -991,7 +1024,7 @@ Qual a quantidade a adicionar?`);
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <p class="font-bold text-lg">Relatório do Dia #${day.id}</p>
-                                        <p class="text-sm text-gray-600">Data: ${new Date(day.date).toLocaleDateString()}</p>
+                                        <p class="text-sm text-gray-600">Data: ${formatDateTime(day.date)}</p>
                                     </div>
                                     <div class="text-right">
                                         <p class="text-sm">Total de Vendas do Dia</p>
@@ -1038,20 +1071,15 @@ Qual a quantidade a adicionar?`);
             document.getElementById('stop-scanner-button')?.addEventListener('click', stopInventoryScan);
             document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
+            document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
+            document.getElementById('close-receipt-button').addEventListener('click', closeReceiptModal);
 
             // --- Event Delegation for Dynamic Content ---
+            document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
+            document.getElementById('close-shift-button')?.addEventListener('click', handleCloseShift);
+            document.getElementById('open-shift-form')?.addEventListener('submit', handleOpenShift);
+            document.getElementById('close-day-button')?.addEventListener('click', handleCloseDay);
 
-            // Cash Register Tab
-            contentCashRegister.addEventListener('submit', function(e) {
-                if (e.target.id === 'open-day-form') handleOpenDay(e);
-                if (e.target.id === 'open-shift-form') handleOpenShift(e);
-            });
-            contentCashRegister.addEventListener('click', function(e) {
-                if (e.target.id === 'close-shift-button') handleCloseShift(e);
-                if (e.target.id === 'close-day-button') handleCloseDay(e);
-            });
-
-            // PDV Tab
             contentPdv.addEventListener('click', function(e) {
                 if (e.target.id === 'start-sale-button') startNewSale(e);
                 if (e.target.id === 'checkout-button') handleCheckout(e);
@@ -1060,7 +1088,6 @@ Qual a quantidade a adicionar?`);
                 if (e.target.id === 'barcode-input-field') handleBarcodeKeypress(e);
             });
 
-            // Inventory Tab
             contentInventory.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-product-form') handleAddProduct(e);
             });
@@ -1068,12 +1095,10 @@ Qual a quantidade a adicionar?`);
                 if (e.target.id === 'scan-inventory-button') startInventoryScan(e);
             });
 
-            // Customers Tab
             contentCustomers.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-customer-form') handleAddCustomer(e);
             });
 
-            // Payment Modal
             paymentModal.addEventListener('click', (e) => {
                 if (e.target.classList.contains('payment-method-btn')) {
                     selectedPaymentMethod = e.target.dataset.method;
@@ -1081,13 +1106,12 @@ Qual a quantidade a adicionar?`);
                 }
             });
             
-            // Debt Modal
             debtPaymentModal.addEventListener('click', (e) => {
                 if (e.target.id === 'pay-full-debt-button') {
-                    const customerId = parseInt(document.getElementById('debt-customer-id').value);
+                    const customerId = document.getElementById('debt-customer-id').value;
                     const customer = customers.find(c => c.id === customerId);
                     if(customer) {
-                        document.getElementById('debt-payment-amount').value = customer.debt.toFixed(2);
+                        document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2);
                     }
                 }
             });
