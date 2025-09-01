@@ -1,5 +1,4 @@
-
-      // CORREÇÃO: As importações do Firebase e a lógica principal foram unificadas aqui.
+// CORREÇÃO: As importações do Firebase e a lógica principal foram unificadas aqui.
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
       import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
       import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
@@ -173,6 +172,7 @@
                 closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 console.log("Dados carregados!", { products, customers, closedDays });
+                console.log('Produtos carregados:', products);
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
                 showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
@@ -312,7 +312,7 @@
                             <div class="bg-gray-50 p-6 rounded-lg">
                                 <p class="text-gray-600 mb-4 text-center">Use a câmera para escanear o código de barras:</p>
                                 <button id="scan-inventory-button" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M3 6h18"/><path d="M3 10h18"/><path d="M3 14h18"/><path d="M3 18h18"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M3 6h18"></path><path d="M3 10h18"></path><path d="M3 14h18"></path><path d="M3 18h18"></svg>
                                     Escanear com a Câmera
                                 </button>
                                 <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
@@ -640,7 +640,9 @@
         }
         
         function handleBarcodeScan(scannedCode) {
+            console.log('Código escaneado:', scannedCode);
             const product = products.find(p => p.barcode === scannedCode);
+            console.log('Produto encontrado (handleBarcodeScan):', product);
             if (product) {
                 addToCart(product.sku);
             } else {
@@ -649,7 +651,9 @@
         }
 
         function addToCart(sku) {
+            console.log('Chamado addToCart com SKU:', sku);
             const product = products.find(p => p.sku === sku);
+            console.log('Produto encontrado (addToCart):', product);
             const cartItem = cart.find(item => item.sku === sku);
             const availableStock = product.stock - (cartItem ? cartItem.quantity : 0);
             if (availableStock <= 0) {
@@ -896,6 +900,25 @@
     }
 }
 
+        async function updateProductStock(productId, quantityToAdd) {
+            try {
+                const productRef = doc(db, "products", productId);
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                    const newStock = product.stock + quantityToAdd;
+                    await updateDoc(productRef, { stock: newStock });
+                    
+                    // Update local data and re-render
+                    await loadInitialData();
+                    renderInventoryManagement();
+                    showModal('Sucesso', `${quantityToAdd} unidades de ${product.name} adicionadas ao estoque.`);
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar estoque:", error);
+                showModal('Erro de Base de Dados', 'Não foi possível atualizar o estoque do produto.');
+            }
+        }
+
         
 
         function startInventoryScan() {
@@ -923,7 +946,7 @@
             handleInventoryScanResult(decodedText);
         }
 
-        function handleInventoryScanResult(barcode) {
+        async function handleInventoryScanResult(barcode) {
             if (!barcode || barcode.trim() === '') return;
 
             const product = products.find(p => p.barcode === barcode.trim());
@@ -931,9 +954,7 @@
                 const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
-                    product.stock += quantity;
-                    renderInventoryManagement();
-                    showModal('Sucesso', `${quantity} unidades de ${product.name} adicionadas ao estoque.`);
+                    await updateProductStock(product.id, quantity);
                 } else if(quantityStr !== null) {
                     showModal('Erro', 'Quantidade inválida.');
                 }
@@ -1064,4 +1085,3 @@
                 }
             });
         });
-    
