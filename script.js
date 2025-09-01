@@ -160,7 +160,7 @@
 
         // --- CARREGAMENTO DE DADOS ---
         async function loadInitialData() {
-            console.log("A procurar dados na base de dados...");
+            // console.log("A procurar dados na base de dados..."); // Removed console.log
             try {
                 const productsSnapshot = await getDocs(collection(db, "products"));
                 products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -171,8 +171,8 @@
                 const daysSnapshot = await getDocs(collection(db, "closedDays"));
                 closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                console.log("Dados carregados!", { products, customers, closedDays });
-                console.log('Produtos carregados:', products);
+                // console.log("Dados carregados!", { products, customers, closedDays }); // Removed console.log
+                // console.log('Produtos carregados:', products); // Removed console.log
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
                 showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
@@ -212,63 +212,28 @@
         
         function renderCashRegisterTab() {
             const userOptions = users.map(user => `<option value="${user}">${user}</option>`).join('');
-            let html = '';
+
+            const cashRegisterClosedState = document.getElementById('cash-register-closed-state');
+            const cashRegisterActiveShiftState = document.getElementById('cash-register-active-shift-state');
+            const cashRegisterWaitingShiftState = document.getElementById('cash-register-waiting-shift-state');
+
+            // Hide all states initially
+            cashRegisterClosedState.classList.add('hidden');
+            cashRegisterActiveShiftState.classList.add('hidden');
+            cashRegisterWaitingShiftState.classList.add('hidden');
 
             if (!currentDay) {
-                html = `
-                <div class="text-center py-12">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-red-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Caixa Fechado</h2>
-                    <form id="open-day-form" class="mt-6 max-w-sm mx-auto space-y-4">
-                        <div>
-                            <label for="initial-cash" class="block text-sm font-medium text-gray-700">Valor Inicial (Fundo de Troco do Dia)</label>
-                            <input type="number" id="initial-cash" placeholder="Ex: 100.00" step="0.01" min="0" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">
-                        </div>
-                        <div>
-                            <label for="opening-user" class="block text-sm font-medium text-gray-700">Operador do 1º Turno</label>
-                            <select id="opening-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
-                        </div>
-                        <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg">Abrir Caixa (Iniciar Dia)</button>
-                    </form>
-                </div>`;
+                cashRegisterClosedState.classList.remove('hidden');
+                document.getElementById('opening-user').innerHTML = userOptions;
             } else if (currentDay && currentShift) {
-                 html = `
-                <div class="text-center py-12">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-green-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 5-5 5 5 0 0 1 5 5v4"></path></svg>
-                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Turno Ativo</h2>
-                    <div class="mt-4 text-gray-600 space-y-2">
-                        <p>Início do Turno: <span id="session-start-time" class="font-semibold"></span></p>
-                        <p>Operador do Turno: <span id="session-opened-by" class="font-semibold"></span></p>
-                    </div>
-                    <div class="mt-8 max-w-sm mx-auto">
-                         <label for="closing-user" class="block text-sm font-medium text-gray-700">Operador de Fechamento</label>
-                         <select id="closing-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
-                         <button id="close-shift-button" class="mt-4 w-full bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg">Fechar Turno</button>
-                    </div>
-                </div>`;
+                cashRegisterActiveShiftState.classList.remove('hidden');
+                document.getElementById('session-start-time').textContent = formatDateTime(currentShift.startTime);
+                document.getElementById('session-opened-by').textContent = currentShift.openedBy;
+                document.getElementById('closing-user').innerHTML = userOptions;
             } else {
-                html = `
-                <div class="text-center py-12">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-blue-500"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v6l4 2"></path></svg>
-                    <h2 class="mt-4 text-2xl font-bold text-gray-800">Dia em Operação (Aguardando Turno)</h2>
-                    <div class="mt-6 max-w-sm mx-auto space-y-4">
-                        <form id="open-shift-form" class="space-y-4 p-4 border rounded-lg">
-                             <h3 class="font-semibold">Iniciar Próximo Turno</h3>
-                             <div>
-                                <label for="next-opening-user" class="block text-sm font-medium text-gray-700">Operador</label>
-                                <select id="next-opening-user" required class="mt-1 block w-full p-2 border rounded-md shadow-sm">${userOptions}</select>
-                             </div>
-                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-8 rounded-lg">Abrir Novo Turno</button>
-                        </form>
-                        <button id="close-day-button" class="w-full bg-red-600 text-white font-bold py-3 px-8 rounded-lg">Fechar Dia e Gerar Relatório Final</button>
-                    </div>
-                </div>`;
+                cashRegisterWaitingShiftState.classList.remove('hidden');
+                document.getElementById('next-opening-user').innerHTML = userOptions;
             }
-            contentCashRegister.innerHTML = html;
-            document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
-            document.getElementById('close-shift-button')?.addEventListener('click', handleCloseShift);
-            document.getElementById('open-shift-form')?.addEventListener('submit', handleOpenShift);
-            document.getElementById('close-day-button')?.addEventListener('click', handleCloseDay);
         }
 
         function renderPdvTab() {
@@ -296,9 +261,7 @@
                     </div>
                 </div>
             `;
-            document.getElementById('start-sale-button').addEventListener('click', startNewSale);
-            document.getElementById('checkout-button').addEventListener('click', handleCheckout);
-            document.getElementById('barcode-input-field').addEventListener('keypress', handleBarcodeKeypress);
+            // Event listeners are now handled by delegation in DOMContentLoaded
             renderProductList();
             renderCart();
         }
@@ -341,9 +304,8 @@
                         </div>
                     </div>
                 </div>
-            `
-            document.getElementById('add-product-form').addEventListener('submit', handleAddProduct);
-            document.getElementById('scan-inventory-button').addEventListener('click', startInventoryScan);
+            `;
+            // Event listeners are now handled by delegation in DOMContentLoaded
             renderInventoryManagement();
         }
 
@@ -374,7 +336,10 @@
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -414,7 +379,7 @@
                     </div>
                 </div>
             `;
-            document.getElementById('add-customer-form').addEventListener('submit', handleAddCustomer);
+            // Event listeners are now handled by delegation in DOMContentLoaded
             renderDebtorsList();
         }
         
@@ -481,7 +446,7 @@
         }
 
         // --- LÓGICA DE CLIENTES E FIADO ---
-        function handleAddCustomer(event) {
+        async function handleAddCustomer(event) { // Added async
             event.preventDefault();
             const name = document.getElementById('new-customer-name').value.trim();
             const phone = document.getElementById('new-customer-phone').value.trim();
@@ -490,11 +455,18 @@
                 showModal('Erro', 'O nome do cliente é obrigatório.');
                 return;
             }
-            const newCustomer = { id: Date.now(), name, phone, debt };
-            customers.push(newCustomer);
-            renderDebtorsList();
-            document.getElementById('add-customer-form').reset();
-            showModal('Sucesso!', 'Novo cliente cadastrado.');
+            // Changed to use Firestore addDoc
+            const newCustomer = { name, phone, debt };
+            try {
+                await addDoc(collection(db, "customers"), newCustomer);
+                await loadInitialData(); // Reload customers to get the Firestore-generated ID
+                renderDebtorsList();
+                document.getElementById('add-customer-form').reset();
+                showModal('Sucesso!', 'Novo cliente cadastrado.');
+            } catch (error) {
+                console.error("Erro ao adicionar cliente:", error);
+                showModal('Erro de Base de Dados', 'Não foi possível guardar o cliente.');
+            }
         }
 
         function renderDebtorsList() {
@@ -640,9 +612,9 @@
         }
         
         function handleBarcodeScan(scannedCode) {
-            console.log('Código escaneado:', scannedCode);
+            // console.log('Código escaneado:', scannedCode); // Removed console.log
             const product = products.find(p => p.barcode === scannedCode);
-            console.log('Produto encontrado (handleBarcodeScan):', product);
+            // console.log('Produto encontrado (handleBarcodeScan):', product); // Removed console.log
             if (product) {
                 addToCart(product.sku);
             } else {
@@ -650,18 +622,26 @@
             }
         }
 
-        function addToCart(sku) {
-            console.log('Chamado addToCart com SKU:', sku);
+        window.addToCart = function(sku) {
             const product = products.find(p => p.sku === sku);
-            console.log('Produto encontrado (addToCart):', product);
+
+            if (!product) {
+                console.error(`Produto com SKU "${sku}" não foi encontrado na lista de produtos carregada.`);
+                showModal("Erro de Produto", `Não foi possível adicionar o item ao carrinho porque o produto com SKU ${sku} não foi encontrado. Isso pode ser um erro de sincronização. Tente recarregar a página.`);
+                return;
+            }
+
             const cartItem = cart.find(item => item.sku === sku);
             const availableStock = product.stock - (cartItem ? cartItem.quantity : 0);
             if (availableStock <= 0) {
                 showModal('Estoque Insuficiente', `Não há mais estoque para ${product.name}.`);
                 return;
             }
-            if (cartItem) cartItem.quantity++;
-            else cart.push({ ...product, quantity: 1 });
+            if (cartItem) {
+                cartItem.quantity++;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
             renderCart();
         }
         
@@ -669,6 +649,7 @@
             const cartItemsEl = document.getElementById('cart-items');
             const checkoutButton = document.getElementById('checkout-button');
             const cartTotalEl = document.getElementById('cart-total');
+            if(!cartItemsEl || !checkoutButton || !cartTotalEl) return; // Guard clause
             if (cart.length === 0) {
                 cartItemsEl.innerHTML = '<p class="text-gray-500 text-center pt-16">Carrinho vazio.</p>';
                 checkoutButton.disabled = true;
@@ -1048,6 +1029,7 @@
 
         // --- INICIALIZAÇÃO E EVENTOS ---
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Static Listeners (these elements are always in the DOM) ---
             loginForm.addEventListener('submit', handleLogin);
             logoutButton.addEventListener('click', handleLogout);
             forgotPasswordLink.addEventListener('click', handleForgotPassword);
@@ -1056,12 +1038,50 @@
             document.getElementById('stop-scanner-button')?.addEventListener('click', stopInventoryScan);
             document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
+
+            // --- Event Delegation for Dynamic Content ---
+
+            // Cash Register Tab
+            contentCashRegister.addEventListener('submit', function(e) {
+                if (e.target.id === 'open-day-form') handleOpenDay(e);
+                if (e.target.id === 'open-shift-form') handleOpenShift(e);
+            });
+            contentCashRegister.addEventListener('click', function(e) {
+                if (e.target.id === 'close-shift-button') handleCloseShift(e);
+                if (e.target.id === 'close-day-button') handleCloseDay(e);
+            });
+
+            // PDV Tab
+            contentPdv.addEventListener('click', function(e) {
+                if (e.target.id === 'start-sale-button') startNewSale(e);
+                if (e.target.id === 'checkout-button') handleCheckout(e);
+            });
+            contentPdv.addEventListener('keypress', function(e) {
+                if (e.target.id === 'barcode-input-field') handleBarcodeKeypress(e);
+            });
+
+            // Inventory Tab
+            contentInventory.addEventListener('submit', function(e) {
+                if (e.target.id === 'add-product-form') handleAddProduct(e);
+            });
+            contentInventory.addEventListener('click', function(e) {
+                if (e.target.id === 'scan-inventory-button') startInventoryScan(e);
+            });
+
+            // Customers Tab
+            contentCustomers.addEventListener('submit', function(e) {
+                if (e.target.id === 'add-customer-form') handleAddCustomer(e);
+            });
+
+            // Payment Modal
             paymentModal.addEventListener('click', (e) => {
                 if (e.target.classList.contains('payment-method-btn')) {
                     selectedPaymentMethod = e.target.dataset.method;
                     renderPaymentModal();
                 }
             });
+            
+            // Debt Modal
             debtPaymentModal.addEventListener('click', (e) => {
                 if (e.target.id === 'pay-full-debt-button') {
                     const customerId = parseInt(document.getElementById('debt-customer-id').value);
@@ -1069,19 +1089,6 @@
                     if(customer) {
                         document.getElementById('debt-payment-amount').value = customer.debt.toFixed(2);
                     }
-                }
-            });
-
-            onAuthStateChanged(auth, user => {
-                if (user) {
-                    loginScreen.classList.add('hidden');
-                    mainApp.classList.remove('hidden');
-                    mainApp.classList.add('flex');
-                    renderAll();
-                } else {
-                    loginScreen.classList.remove('hidden');
-                    mainApp.classList.add('hidden');
-                    mainApp.classList.remove('flex');
                 }
             });
         });
