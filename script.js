@@ -439,11 +439,19 @@ Qual a quantidade a adicionar?`);
                             detailsText = JSON.stringify(log.details);
                     }
 
+                    const isUndoable = ['PRODUTO_ADICIONADO', 'ESTOQUE_ATUALIZADO'].includes(log.type);
+                    const logString = btoa(JSON.stringify(log)); // Encode to base64 to avoid quote issues
+
                     return `
-                        <div class="border-b p-3 hover:bg-gray-50">
-                            <p class="font-semibold text-gray-800">${log.type.replace(/_/g, ' ')}</p>
-                            <p class="text-sm text-gray-600">${detailsText}</p>
-                            <p class="text-xs text-gray-400 mt-1">${formatDateTime(log.timestamp)} por ${log.user}</p>
+                        <div class="border-b p-3 hover:bg-gray-50 flex justify-between items-center">
+                            <div>
+                                <p class="font-semibold text-gray-800">${log.type.replace(/_/g, ' ')}</p>
+                                <p class="text-sm text-gray-600">${detailsText}</p>
+                                <p class="text-xs text-gray-400 mt-1">${formatDateTime(log.timestamp)} por ${log.user}</p>
+                            </div>
+                            <div>
+                                ${isUndoable ? `<button onclick="window.handleUndoActivity('${logString}')" class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-200">Desfazer</button>` : ''}
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -451,6 +459,48 @@ Qual a quantidade a adicionar?`);
             } catch (error) {
                 console.error("Erro ao carregar log de atividades:", error);
                 document.getElementById('activities-list-container').innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
+            }
+        }
+
+        window.handleUndoActivity = async function(encodedLog) {
+            const log = JSON.parse(atob(encodedLog));
+            
+            if (!confirm(`Tem certeza que deseja desfazer esta ação?\n\nTipo: ${log.type.replace(/_/g, ' ')}`)) {
+                return;
+            }
+
+            try {
+                switch(log.type) {
+                    case 'PRODUTO_ADICIONADO':
+                        await deleteDoc(doc(db, "products", log.details.productId));
+                        showModal('Ação Desfeita', `O produto "${log.details.name}" foi apagado.`);
+                        break;
+                    
+                    case 'ESTOQUE_ATUALIZADO':
+                        const productRef = doc(db, "products", log.details.productId);
+                        const productToUpdate = products.find(p => p.id === log.details.productId);
+                        if (productToUpdate) {
+                            const revertedStock = productToUpdate.stock - log.details.quantityAdded;
+                            await updateDoc(productRef, { stock: revertedStock });
+                            showModal('Ação Desfeita', `O estoque de "${log.details.productName}" foi revertido para ${revertedStock}.`);
+                        } else {
+                            throw new Error('Produto não encontrado para reverter o estoque.');
+                        }
+                        break;
+
+                    default:
+                        showModal('Erro', 'Este tipo de ação não pode ser desfeita.');
+                        return;
+                }
+                
+                // ToDo: Mark log as undone in the future? For now, just re-render.
+                await loadInitialData();
+                renderAll();
+                changeTab('activities'); // Go back to activities tab
+
+            } catch (error) {
+                console.error("Erro ao desfazer atividade:", error);
+                showModal('Erro ao Desfazer', 'Não foi possível reverter a ação. Verifique o console para mais detalhes.');
             }
         }
         
