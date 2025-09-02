@@ -994,6 +994,13 @@ Qual a quantidade a adicionar?`);
                 return;
             }
 
+            // Verificação de SKU duplicado
+            const existingProduct = products.find(p => p.sku.toLowerCase() === sku.toLowerCase());
+            if (existingProduct) {
+                showModal('SKU Duplicado', `O SKU "${sku}" já está sendo utilizado pelo produto "${existingProduct.name}". Por favor, use um código diferente.`);
+                return;
+            }
+
             const newProduct = { sku, barcode, name, price, stock, minStock };
 
             try {
