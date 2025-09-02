@@ -1,6 +1,6 @@
 // CORREÇÃO: As importações do Firebase e a lógica principal foram unificadas aqui.
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
       import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
       // --- CONFIGURAÇÃO DO FIREBASE ---
@@ -9,7 +9,7 @@
         apiKey: "AIzaSyD0aw5it4FgY7TdCIUrj9cGfGp3c0au10U",
         authDomain: "topdelinhacaixaestoque.firebaseapp.com",
         projectId: "topdelinhacaixaestoque",
-        storageBucket: "topdelinhacaixaestoque.firebasestorage.app",
+        storageBucket: "topdelinhacaixaestoque.firestorage.app",
         messagingSenderId: "177632701767",
         appId: "1:177632701767:web:ad38d9abb95a321d42b062",
         measurementId: "G-M0PEZ05LWE"
@@ -51,6 +51,7 @@
         const contentInventory = document.getElementById('content-inventory');
         const contentCustomers = document.getElementById('content-customers');
         const contentReports = document.getElementById('content-reports');
+        const contentActivities = document.getElementById('content-activities');
         const tabPdv = document.getElementById('tab-pdv');
         const paymentModal = document.getElementById('payment-modal');
         const confirmSaleButton = document.getElementById('confirm-sale-button');
@@ -146,6 +147,7 @@
             if (tabName === 'dashboard') renderDashboardTab();
             if (tabName === 'reports') renderReportsTab();
             if (tabName === 'customers') renderCustomersTab();
+            if (tabName === 'activities') renderActivityTab();
         }
         
         // --- RENDERIZAÇÃO GERAL E INICIALIZAÇÃO ---
@@ -174,6 +176,20 @@
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
                 showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
+            }
+        }
+
+        // --- LOG DE ATIVIDADES ---
+        async function logActivity(type, details, user = 'Sistema') {
+            try {
+                await addDoc(collection(db, "activity_log"), {
+                    timestamp: new Date().toISOString(),
+                    type,
+                    user,
+                    details
+                });
+            } catch (error) {
+                console.error("Erro ao registrar atividade no log:", error);
             }
         }
 
@@ -331,7 +347,10 @@
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -379,6 +398,60 @@
                 </div>
             `;
             renderSessionReports();
+        }
+
+        async function renderActivityTab() {
+            contentActivities.innerHTML = `<h3 class="font-semibold text-xl text-gray-700 mb-4">Log de Atividades Recentes</h3><div id="activities-list-container">Carregando...</div>`;
+            
+            try {
+                const q = query(collection(db, "activity_log"), orderBy("timestamp", "desc"), limit(50));
+                const logSnapshot = await getDocs(q);
+                const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                const container = document.getElementById('activities-list-container');
+                if (logs.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500">Nenhuma atividade registrada ainda.</p>';
+                    return;
+                }
+
+                container.innerHTML = logs.map(log => {
+                    let detailsText = '';
+                    switch(log.type) {
+                        case 'VENDA_CRIADA':
+                            detailsText = `Venda #${log.details.saleId} no valor de ${formatCurrency(log.details.total)} para ${log.details.customerName}.`;
+                            break;
+                        case 'PRODUTO_ADICIONADO':
+                            detailsText = `Novo produto: ${log.details.name} (SKU: ${log.details.sku}) com estoque inicial de ${log.details.stock}.`;
+                            break;
+                        case 'ESTOQUE_ATUALIZADO':
+                            detailsText = `Adicionadas ${log.details.quantityAdded} unidades de "${log.details.productName}". Novo estoque: ${log.details.newStock}.`;
+                            break;
+                        case 'CLIENTE_ADICIONADO':
+                            detailsText = `Novo cliente cadastrado: ${log.details.name}.`;
+                            break;
+                        case 'CLIENTE_ATUALIZADO':
+                            detailsText = `Dados do cliente "${log.details.name}" foram atualizados.`;
+                            break;
+                        case 'PAGAMENTO_DIVIDA':
+                            detailsText = `Recebido ${formatCurrency(log.details.amount)} de ${log.details.customerName}.`;
+                            break;
+                        default:
+                            detailsText = JSON.stringify(log.details);
+                    }
+
+                    return `
+                        <div class="border-b p-3 hover:bg-gray-50">
+                            <p class="font-semibold text-gray-800">${log.type.replace(/_/g, ' ')}</p>
+                            <p class="text-sm text-gray-600">${detailsText}</p>
+                            <p class="text-xs text-gray-400 mt-1">${formatDateTime(log.timestamp)} por ${log.user}</p>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error("Erro ao carregar log de atividades:", error);
+                document.getElementById('activities-list-container').innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
+            }
         }
         
         // --- LÓGICA DE GESTÃO DE CAIXA ---
@@ -446,7 +519,8 @@
             }
             const newCustomer = { name, phone, debt };
             try {
-                await addDoc(collection(db, "customers"), newCustomer);
+                const docRef = await addDoc(collection(db, "customers"), newCustomer);
+                await logActivity('CLIENTE_ADICIONADO', { customerId: docRef.id, name, phone }, currentShift ? currentShift.openedBy : 'Sistema');
                 await loadInitialData(); 
                 renderDebtorsList();
                 document.getElementById('add-customer-form').reset();
@@ -542,6 +616,12 @@
                 if (currentShift) {
                     currentShift.debtPayments.push({ customerId, customerName: customer.name, amount, method });
                 }
+                await logActivity('PAGAMENTO_DIVIDA', {
+                    customerId: customer.id,
+                    customerName: customer.name,
+                    amount: amount,
+                    method: method
+                }, currentShift.openedBy);
                 await loadInitialData();
                 renderDebtorsList();
                 closeDebtPaymentModal();
@@ -578,6 +658,7 @@
 
             try {
                 await updateDoc(customerRef, { name, phone, debt });
+                await logActivity('CLIENTE_ATUALIZADO', { customerId, name, phone }, currentShift ? currentShift.openedBy : 'Sistema');
                 await loadInitialData();
                 renderDebtorsList();
                 closeEditCustomerModal();
@@ -784,6 +865,15 @@
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
             const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
 
+            const customer = customers.find(c => c.id === saleInProgress.customerId);
+            await logActivity('VENDA_CRIADA', {
+                saleId: saleInProgress.id,
+                shiftId: currentShift.id,
+                total: saleInProgress.total,
+                customerName: customer ? customer.name : 'Consumidor Final',
+                items: saleInProgress.items.map(i => `${i.quantity}x ${i.name}`)
+            }, currentShift.openedBy);
+
             await loadInitialData();
             renderAll();
             resetPdv();
@@ -907,7 +997,14 @@
             const newProduct = { sku, barcode, name, price, stock, minStock };
 
             try {
-                await addDoc(collection(db, "products"), newProduct);
+                const docRef = await addDoc(collection(db, "products"), newProduct);
+                await logActivity('PRODUTO_ADICIONADO', {
+                    productId: docRef.id,
+                    sku: newProduct.sku,
+                    name: newProduct.name,
+                    price: newProduct.price,
+                    stock: newProduct.stock
+                }, currentShift ? currentShift.openedBy : 'Sistema');
                 showModal('Sucesso!', 'Produto adicionado à base de dados.');
                 document.getElementById('add-product-form').reset();
                 await loadInitialData(); 
@@ -925,7 +1022,12 @@
                 if (product) {
                     const newStock = product.stock + quantityToAdd;
                     await updateDoc(productRef, { stock: newStock });
-                    
+                    await logActivity('ESTOQUE_ATUALIZADO', { 
+                        productId: product.id, 
+                        productName: product.name, 
+                        quantityAdded: quantityToAdd, 
+                        newStock 
+                    }, currentShift ? currentShift.openedBy : 'Sistema');
                     await loadInitialData();
                     renderInventoryManagement();
                     showModal('Sucesso', `${quantityToAdd} unidades de ${product.name} adicionadas ao estoque.`);
@@ -966,7 +1068,10 @@
 
             const product = products.find(p => p.barcode === barcode.trim());
             if (product) {
-                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+                const quantityStr = prompt(`Produto encontrado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
                     await updateProductStock(product.id, quantity);
@@ -974,7 +1079,8 @@
                     showModal('Erro', 'Quantidade inválida.');
                 }
             } else {
-                if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.
+Deseja cadastrá-lo agora?`)) {
                     changeTab('inventory');
                     document.getElementById('new-barcode').value = barcode.trim();
                     document.getElementById('new-sku').focus();
