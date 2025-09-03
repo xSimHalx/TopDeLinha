@@ -435,11 +435,20 @@ Qual a quantidade a adicionar?`);
                         case 'PAGAMENTO_DIVIDA':
                             detailsText = `Recebido ${formatCurrency(log.details.amount)} de ${log.details.customerName}.`;
                             break;
+                        case 'PRODUTO_DESFEITO':
+                            detailsText = `Ação de adicionar o produto "${log.details.productName}" (SKU: ${log.details.sku}) foi desfeita.`;
+                            break;
+                        case 'ESTOQUE_DESFEITO':
+                            detailsText = `Ação de adicionar ${log.details.quantityReverted} unidades ao estoque de "${log.details.productName}" foi desfeita. Novo estoque: ${log.details.newStock}.`;
+                            break;
+                        case 'CLIENTE_DESFEITO':
+                            detailsText = `Ação de adicionar o cliente "${log.details.customerName}" foi desfeita.`;
+                            break;
                         default:
                             detailsText = JSON.stringify(log.details);
                     }
 
-                    const isUndoable = ['PRODUTO_ADICIONADO', 'ESTOQUE_ATUALIZADO'].includes(log.type);
+                    const isUndoable = ['PRODUTO_ADICIONADO', 'ESTOQUE_ATUALIZADO', 'CLIENTE_ADICIONADO'].includes(log.type) && !log.undone;
                     const logString = btoa(JSON.stringify(log)); // Encode to base64 to avoid quote issues
 
                     return `
@@ -474,6 +483,12 @@ Qual a quantidade a adicionar?`);
                     case 'PRODUTO_ADICIONADO':
                         await deleteDoc(doc(db, "products", log.details.productId));
                         showModal('Ação Desfeita', `O produto "${log.details.name}" foi apagado.`);
+                        await logActivity('PRODUTO_DESFEITO', {
+                            originalLogId: log.id,
+                            productId: log.details.productId,
+                            productName: log.details.name,
+                            sku: log.details.sku
+                        }, currentShift ? currentShift.openedBy : 'Sistema');
                         break;
                     
                     case 'ESTOQUE_ATUALIZADO':
@@ -483,9 +498,26 @@ Qual a quantidade a adicionar?`);
                             const revertedStock = productToUpdate.stock - log.details.quantityAdded;
                             await updateDoc(productRef, { stock: revertedStock });
                             showModal('Ação Desfeita', `O estoque de "${log.details.productName}" foi revertido para ${revertedStock}.`);
+                            await logActivity('ESTOQUE_DESFEITO', {
+                                originalLogId: log.id,
+                                productId: log.details.productId,
+                                productName: log.details.productName,
+                                quantityReverted: log.details.quantityAdded,
+                                newStock: revertedStock
+                            }, currentShift ? currentShift.openedBy : 'Sistema');
                         } else {
                             throw new Error('Produto não encontrado para reverter o estoque.');
                         }
+                        break;
+
+                    case 'CLIENTE_ADICIONADO':
+                        await deleteDoc(doc(db, "customers", log.details.customerId));
+                        showModal('Ação Desfeita', `O cliente "${log.details.name}" foi apagado.`);
+                        await logActivity('CLIENTE_DESFEITO', {
+                            originalLogId: log.id,
+                            customerId: log.details.customerId,
+                            customerName: log.details.name
+                        }, currentShift ? currentShift.openedBy : 'Sistema');
                         break;
 
                     default:
@@ -493,16 +525,20 @@ Qual a quantidade a adicionar?`);
                         return;
                 }
                 
-                // ToDo: Mark log as undone in the future? For now, just re-render.
+                const logRef = doc(db, "activity_log", log.id);
+                await updateDoc(logRef, { undone: true });
+                
                 await loadInitialData();
                 renderAll();
-                changeTab('activities'); // Go back to activities tab
+                changeTab('activities');
 
             } catch (error) {
                 console.error("Erro ao desfazer atividade:", error);
                 showModal('Erro ao Desfazer', 'Não foi possível reverter a ação. Verifique o console para mais detalhes.');
             }
         }
+
+        
         
         // --- LÓGICA DE GESTÃO DE CAIXA ---
         function updateCashRegisterStatus() {
@@ -542,19 +578,28 @@ Qual a quantidade a adicionar?`);
             showModal('Turno Fechado', 'O próximo operador pode iniciar um novo turno ou o dia pode ser fechado.');
         }
         
-        function handleCloseDay() {
+        async function handleCloseDay() {
             if (!currentDay || currentShift) {
                 showModal('Ação Inválida', 'Feche o turno atual antes de fechar o dia.');
                 return;
             }
             currentDay.status = 'closed';
-            closedDays.push(currentDay);
-            currentDay = null;
-            renderCashRegisterTab();
-            updateCashRegisterStatus();
-            renderReportsTab();
-            showModal('Dia Fechado', 'O dia de operações foi encerrado e o relatório final gerado.');
-            changeTab('reports');
+
+            try {
+                await addDoc(collection(db, "closedDays"), currentDay);
+                currentDay = null;
+                await loadInitialData(); // Recarrega os dados, incluindo o dia que acabamos de fechar
+                
+                renderCashRegisterTab();
+                updateCashRegisterStatus();
+                renderReportsTab();
+                showModal('Dia Fechado', 'O dia de operações foi encerrado e o relatório salvo com sucesso.');
+                changeTab('reports');
+            } catch (error) {
+                console.error("Erro ao fechar o dia:", error);
+                showModal("Erro de Base de Dados", "Não foi possível salvar o relatório do dia. Por favor, tente novamente.");
+                currentDay.status = 'open'; // Reverte a mudança de status se a gravação falhar
+            }
         }
 
         // --- LÓGICA DE CLIENTES E FIADO ---
