@@ -1,6 +1,6 @@
 // CORREÇÃO: As importações do Firebase e a lógica principal foram unificadas aqui.
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
       import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
       // --- CONFIGURAÇÃO DO FIREBASE ---
@@ -170,8 +170,28 @@
                 const customersSnapshot = await getDocs(collection(db, "customers"));
                 customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                const daysSnapshot = await getDocs(collection(db, "closedDays"));
-                closedDays = daysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Query for the open day
+                const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), limit(1));
+                const openDaySnapshot = await getDocs(openDayQuery);
+
+                if (!openDaySnapshot.empty) {
+                    const openDayDoc = openDaySnapshot.docs[0];
+                    currentDay = { id: openDayDoc.id, ...openDayDoc.data() };
+                    if (currentDay.shifts) {
+                        currentShift = currentDay.shifts.find(shift => !shift.endTime) || null;
+                    } else {
+                        currentDay.shifts = [];
+                        currentShift = null;
+                    }
+                } else {
+                    currentDay = null;
+                    currentShift = null;
+                }
+
+                // Load closed days for reports
+                const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), orderBy("date", "desc"));
+                const closedDaysSnapshot = await getDocs(closedDaysQuery);
+                closedDays = closedDaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             } catch (error) {
                 console.error("Erro ao carregar dados iniciais:", error);
@@ -545,34 +565,87 @@ Qual a quantidade a adicionar?`);
             tabPdv.disabled = !currentShift;
         }
         
-        function handleOpenDay(event) {
+        async function updateCurrentDayInFirestore() {
+            if (!currentDay || !currentDay.id) return;
+            try {
+                const dayRef = doc(db, "operating_days", currentDay.id);
+                await updateDoc(dayRef, JSON.parse(JSON.stringify(currentDay)));
+            } catch (error) {
+                console.error("Erro ao atualizar o dia no Firestore:", error);
+                showModal("Erro de Sincronização", "Não foi possível salvar as alterações do dia. Verifique a conexão.");
+            }
+        }
+
+        async function handleOpenDay(event) {
             event.preventDefault();
+            
+            // Check if there is already an open day
+            const q = query(collection(db, "operating_days"), where("status", "==", "open"), limit(1));
+            const openDaySnapshot = await getDocs(q);
+
+            if (!openDaySnapshot.empty) {
+                showModal('Ação Inválida', 'Já existe um dia aberto. Feche o dia atual antes de abrir um novo.');
+                return;
+            }
+
             const initialCash = parseFloat(document.getElementById('initial-cash').value);
             const openedBy = document.getElementById('opening-user').value;
             if (isNaN(initialCash) || initialCash < 0) {
                 showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
                 return;
             }
-            currentDay = { id: closedDays.length + 1, date: new Date(), initialCash, shifts: [], status: 'open' };
-            handleOpenShift(null, openedBy);
+
+            const dayData = { 
+                date: new Date().toISOString(), 
+                initialCash, 
+                shifts: [], 
+                status: 'open' 
+            };
+
+            try {
+                const docRef = await addDoc(collection(db, "operating_days"), dayData);
+                currentDay = { ...dayData, id: docRef.id };
+                await handleOpenShift(null, openedBy);
+            } catch (error) {
+                console.error("Erro ao abrir o dia:", error);
+                showModal("Erro de Base de Dados", "Não foi possível criar o novo dia de operação.");
+            }
         }
 
-        function handleOpenShift(event, user) {
+        async function handleOpenShift(event, user) {
             if(event) event.preventDefault();
             const openedBy = user || document.getElementById('next-opening-user').value;
-            currentShift = { id: currentDay.shifts.length + 1, startTime: new Date(), endTime: null, openedBy, closedBy: null, sales: [], debtPayments: [] };
+            
+            currentShift = { 
+                id: currentDay.shifts.length + 1, 
+                startTime: new Date().toISOString(), 
+                endTime: null, 
+                openedBy, 
+                closedBy: null, 
+                sales: [], 
+                debtPayments: [] 
+            };
+            currentDay.shifts.push(currentShift);
+
+            await updateCurrentDayInFirestore();
             renderCashRegisterTab();
             updateCashRegisterStatus();
             showModal('Turno Aberto!', 'Você já pode iniciar as vendas.');
         }
 
-        function handleCloseShift() {
+        async function handleCloseShift() {
             if (!currentShift) return;
             const closedBy = document.getElementById('closing-user').value;
-            currentShift.endTime = new Date();
-            currentShift.closedBy = closedBy;
-            currentDay.shifts.push(currentShift);
+            
+            const shiftInDay = currentDay.shifts.find(s => s.id === currentShift.id);
+            if (shiftInDay) {
+                shiftInDay.endTime = new Date().toISOString();
+                shiftInDay.closedBy = closedBy;
+            }
+            
             currentShift = null;
+            
+            await updateCurrentDayInFirestore();
             renderCashRegisterTab();
             updateCashRegisterStatus();
             showModal('Turno Fechado', 'O próximo operador pode iniciar um novo turno ou o dia pode ser fechado.');
@@ -586,9 +659,10 @@ Qual a quantidade a adicionar?`);
             currentDay.status = 'closed';
 
             try {
-                await addDoc(collection(db, "closedDays"), currentDay);
+                await updateCurrentDayInFirestore();
                 currentDay = null;
-                await loadInitialData(); // Recarrega os dados, incluindo o dia que acabamos de fechar
+                currentShift = null;
+                await loadInitialData();
                 
                 renderCashRegisterTab();
                 updateCashRegisterStatus();
@@ -598,7 +672,7 @@ Qual a quantidade a adicionar?`);
             } catch (error) {
                 console.error("Erro ao fechar o dia:", error);
                 showModal("Erro de Base de Dados", "Não foi possível salvar o relatório do dia. Por favor, tente novamente.");
-                currentDay.status = 'open'; // Reverte a mudança de status se a gravação falhar
+                currentDay.status = 'open';
             }
         }
 
@@ -710,6 +784,7 @@ Qual a quantidade a adicionar?`);
                 await updateDoc(customerRef, { debt: newDebt });
                 if (currentShift) {
                     currentShift.debtPayments.push({ customerId, customerName: customer.name, amount, method });
+                    await updateCurrentDayInFirestore();
                 }
                 await logActivity('PAGAMENTO_DIVIDA', {
                     customerId: customer.id,
