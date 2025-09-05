@@ -1,6 +1,5 @@
-// CORREÇÃO: As importações do Firebase e a lógica principal foram unificadas aqui.
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+      import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
       import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
       // --- CONFIGURAÇÃO DO FIREBASE ---
@@ -29,7 +28,6 @@
       // --- BASE DE DADOS (Agora serão carregados do Firebase) ---
         let products = [];
         let customers = [];
-        const users = ['Edson', 'Edna'];
         let cart = [];
         let closedDays = [];
         let currentDay = null;
@@ -38,6 +36,7 @@
         let html5QrcodeScanner = null;
         let selectedPaymentMethod = 'Dinheiro';
         let salesChart = null;
+        let settings = {}; // NEW: To store settings
 
         // --- ELEMENTOS DO DOM ---
         const loginScreen = document.getElementById('login-screen');
@@ -52,6 +51,7 @@
         const contentCustomers = document.getElementById('content-customers');
         const contentReports = document.getElementById('content-reports');
         const contentActivities = document.getElementById('content-activities');
+        const contentSettings = document.getElementById('content-settings'); // NEW
         const tabPdv = document.getElementById('tab-pdv');
         const paymentModal = document.getElementById('payment-modal');
         const confirmSaleButton = document.getElementById('confirm-sale-button');
@@ -60,7 +60,7 @@
         const editCustomerModal = document.getElementById('edit-customer-modal');
         const debtPaymentModal = document.getElementById('debt-payment-modal');
         const receiptModal = document.getElementById('receipt-modal');
-        
+
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
         const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -148,6 +148,7 @@
             if (tabName === 'reports') renderReportsTab();
             if (tabName === 'customers') renderCustomersTab();
             if (tabName === 'activities') renderActivityTab();
+            if (tabName === 'settings') renderSettingsTab(); // NEW
         }
         
         // --- RENDERIZAÇÃO GERAL E INICIALIZAÇÃO ---
@@ -158,20 +159,78 @@
             renderInventoryTab();
             renderCustomersTab();
             renderReportsTab();
+            renderSettingsTab(); // NEW
             updateCashRegisterStatus();
         }
 
         // --- CARREGAMENTO DE DADOS ---
         async function loadInitialData() {
+            if (!auth.currentUser) return;
+            const uid = auth.currentUser.uid;
+            console.log("Loading data for user:", uid); // DEBUG
+
             try {
-                const productsSnapshot = await getDocs(collection(db, "products"));
+                // Fetch settings first
+                const settingsRef = doc(db, "settings", uid);
+                const settingsSnap = await getDoc(settingsRef);
+                let settingsData = {};
+                let needsUpdate = false;
+
+                console.log("Settings snapshot exists:", settingsSnap.exists()); // DEBUG
+
+                if (settingsSnap.exists()) {
+                    settingsData = settingsSnap.data();
+                    console.log("Loaded settings:", settingsData); // DEBUG
+                } else {
+                    console.log("No settings found, creating default settings."); // DEBUG
+                    settingsData = {
+                        companyInfo: {
+                            name: 'Sua Loja Aqui',
+                            address: 'Seu Endereço',
+                            cnpj: '00.000.000/0000-00',
+                            receiptMessage: 'Obrigado pela preferência!'
+                        },
+                        operators: ['Caixa 1', 'Gerente']
+                    };
+                    needsUpdate = true;
+                }
+
+                // Ensure operators array exists
+                if (!settingsData.operators) {
+                    console.log("Operators not found, creating default."); // DEBUG
+                    settingsData.operators = ['Caixa 1', 'Gerente'];
+                    needsUpdate = true;
+                }
+
+                // Ensure companyInfo object exists
+                if (!settingsData.companyInfo) {
+                    console.log("CompanyInfo not found, creating default."); // DEBUG
+                    settingsData.companyInfo = {
+                        name: 'Sua Loja Aqui',
+                        address: 'Seu Endereço',
+                        cnpj: '00.000.000/0000-00',
+                        receiptMessage: 'Obrigado pela preferência!'
+                    };
+                    needsUpdate = true;
+                }
+
+                settings = settingsData;
+
+                if (needsUpdate) {
+                    console.log("Updating settings in Firestore with defaults."); // DEBUG
+                    await setDoc(settingsRef, settings, { merge: true });
+                }
+
+                const productsQuery = query(collection(db, "products"), where("usuarioId", "==", uid));
+                const productsSnapshot = await getDocs(productsQuery);
                 products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                const customersSnapshot = await getDocs(collection(db, "customers"));
+                const customersQuery = query(collection(db, "customers"), where("usuarioId", "==", uid));
+                const customersSnapshot = await getDocs(customersQuery);
                 customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 // Query for the open day
-                const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), limit(1));
+                const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), where("usuarioId", "==", uid), limit(1));
                 const openDaySnapshot = await getDocs(openDayQuery);
 
                 if (!openDaySnapshot.empty) {
@@ -189,7 +248,7 @@
                 }
 
                 // Load closed days for reports
-                const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), orderBy("date", "desc"));
+                const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), where("usuarioId", "==", uid), orderBy("date", "desc"));
                 const closedDaysSnapshot = await getDocs(closedDaysQuery);
                 closedDays = closedDaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -201,12 +260,14 @@
 
         // --- LOG DE ATIVIDADES ---
         async function logActivity(type, details, user = 'Sistema') {
+            if (!auth.currentUser) return;
             try {
                 await addDoc(collection(db, "activity_log"), {
                     timestamp: new Date().toISOString(),
                     type,
                     user,
-                    details
+                    details,
+                    usuarioId: auth.currentUser.uid
                 });
             } catch (error) {
                 console.error("Erro ao registrar atividade no log:", error);
@@ -245,7 +306,7 @@
         }
         
         function renderCashRegisterTab() {
-            const userOptions = users.map(user => `<option value="${user}">${user}</option>`).join('');
+            const userOptions = settings.operators.map(user => `<option value="${user}">${user}</option>`).join('');
 
             const cashRegisterClosedState = document.getElementById('cash-register-closed-state');
             const cashRegisterActiveShiftState = document.getElementById('cash-register-active-shift-state');
@@ -367,10 +428,7 @@
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}
-Estoque atual: ${product.stock}
-
-Qual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -423,10 +481,13 @@ Qual a quantidade a adicionar?`);
         async function renderActivityTab() {
             contentActivities.innerHTML = `<h3 class="font-semibold text-xl text-gray-700 mb-4">Log de Atividades Recentes</h3><div id="activities-list-container">Carregando...</div>`;
             
+            if (!auth.currentUser) return;
+            const uid = auth.currentUser.uid;
+
             try {
-                const q = query(collection(db, "activity_log"), orderBy("timestamp", "desc"), limit(50));
+                const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "asc"), limit(50));
                 const logSnapshot = await getDocs(q);
-                const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
 
                 const container = document.getElementById('activities-list-container');
                 if (logs.length === 0) {
@@ -490,6 +551,94 @@ Qual a quantidade a adicionar?`);
                 document.getElementById('activities-list-container').innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
             }
         }
+
+        // NEW: Settings Tab Logic
+        function renderSettingsTab() {
+            if (!settings || !settings.companyInfo) return; // Wait for settings to be loaded
+
+            // Populate company info form
+            document.getElementById('store-name').value = settings.companyInfo.name || '';
+            document.getElementById('store-address').value = settings.companyInfo.address || '';
+            document.getElementById('store-cnpj').value = settings.companyInfo.cnpj || '';
+            document.getElementById('store-receipt-message').value = settings.companyInfo.receiptMessage || '';
+
+            // Populate operators list
+            const operatorsListEl = document.getElementById('operators-list');
+            operatorsListEl.innerHTML = settings.operators.map(op => `
+                <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
+                    <span>${op}</span>
+                    <button onclick="handleRemoveOperator('${op}')" class="text-red-500 hover:text-red-700 font-bold">Remover</button>
+                </div>
+            `).join('');
+        }
+
+        async function handleSaveCompanyInfo(event) {
+            event.preventDefault();
+            if (!auth.currentUser) return;
+
+            const newCompanyInfo = {
+                name: document.getElementById('store-name').value,
+                address: document.getElementById('store-address').value,
+                cnpj: document.getElementById('store-cnpj').value,
+                receiptMessage: document.getElementById('store-receipt-message').value,
+            };
+
+            try {
+                const settingsRef = doc(db, "settings", auth.currentUser.uid);
+                await setDoc(settingsRef, { companyInfo: newCompanyInfo }, { merge: true });
+                settings.companyInfo = newCompanyInfo; // Update local state
+                showModal('Sucesso', 'Informações da empresa salvas.');
+            } catch (error) {
+                console.error("Erro ao salvar informações da empresa:", error);
+                showModal('Erro', 'Não foi possível salvar as informações.');
+            }
+        }
+
+        async function handleAddOperator(event) {
+            event.preventDefault();
+            if (!auth.currentUser) return;
+
+            const newOperatorName = document.getElementById('new-operator-name').value.trim();
+            if (!newOperatorName) return;
+
+            if (settings.operators.includes(newOperatorName)) {
+                showModal('Operador Existente', 'Este nome de operador já existe.');
+                return;
+            }
+
+            const updatedOperators = [...settings.operators, newOperatorName];
+
+            try {
+                const settingsRef = doc(db, "settings", auth.currentUser.uid);
+                await setDoc(settingsRef, { operators: updatedOperators }, { merge: true });
+                settings.operators = updatedOperators; // Update local state
+                renderSettingsTab(); // Re-render the list
+                renderCashRegisterTab(); // Update dropdowns elsewhere
+                document.getElementById('add-operator-form').reset();
+            } catch (error) {
+                console.error("Erro ao adicionar operador:", error);
+                showModal('Erro', 'Não foi possível adicionar o operador.');
+            }
+        }
+
+        window.handleRemoveOperator = async function(operatorName) {
+            if (!auth.currentUser) return;
+            if (!confirm(`Tem certeza que deseja remover o operador "${operatorName}"?`)) return;
+
+            const updatedOperators = settings.operators.filter(op => op !== operatorName);
+
+            try {
+                const settingsRef = doc(db, "settings", auth.currentUser.uid);
+                await setDoc(settingsRef, { operators: updatedOperators }, { merge: true });
+                settings.operators = updatedOperators; // Update local state
+                renderSettingsTab(); // Re-render the list
+                renderCashRegisterTab(); // Update dropdowns elsewhere
+            } catch (error) {
+                console.error("Erro ao remover operador:", error);
+                showModal('Erro', 'Não foi possível remover o operador.');
+            }
+        }
+
 
         window.handleUndoActivity = async function(encodedLog) {
             const log = JSON.parse(atob(encodedLog));
@@ -579,8 +728,11 @@ Qual a quantidade a adicionar?`);
         async function handleOpenDay(event) {
             event.preventDefault();
             
+            if (!auth.currentUser) return;
+            const uid = auth.currentUser.uid;
+
             // Check if there is already an open day
-            const q = query(collection(db, "operating_days"), where("status", "==", "open"), limit(1));
+            const q = query(collection(db, "operating_days"), where("status", "==", "open"), where("usuarioId", "==", uid), limit(1));
             const openDaySnapshot = await getDocs(q);
 
             if (!openDaySnapshot.empty) {
@@ -599,7 +751,8 @@ Qual a quantidade a adicionar?`);
                 date: new Date().toISOString(), 
                 initialCash, 
                 shifts: [], 
-                status: 'open' 
+                status: 'open',
+                usuarioId: uid
             };
 
             try {
@@ -677,8 +830,10 @@ Qual a quantidade a adicionar?`);
         }
 
         // --- LÓGICA DE CLIENTES E FIADO ---
-        async function handleAddCustomer(event) { 
+        async function handleAddCustomer(event) {
             event.preventDefault();
+            if (!auth.currentUser) return;
+
             const name = document.getElementById('new-customer-name').value.trim();
             const phone = document.getElementById('new-customer-phone').value.trim();
             const debt = parseFloat(document.getElementById('new-customer-debt').value) || 0;
@@ -686,7 +841,7 @@ Qual a quantidade a adicionar?`);
                 showModal('Erro', 'O nome do cliente é obrigatório.');
                 return;
             }
-            const newCustomer = { name, phone, debt };
+            const newCustomer = { name, phone, debt, usuarioId: auth.currentUser.uid };
             try {
                 const docRef = await addDoc(collection(db, "customers"), newCustomer);
                 await logActivity('CLIENTE_ADICIONADO', { customerId: docRef.id, name, phone }, currentShift ? currentShift.openedBy : 'Sistema');
@@ -1053,6 +1208,12 @@ Qual a quantidade a adicionar?`);
         }
 
         function renderReceipt(saleData, change) {
+            const ci = settings.companyInfo;
+            document.getElementById('receipt-store-name').textContent = ci.name;
+            document.getElementById('receipt-store-address').textContent = ci.address;
+            document.getElementById('receipt-store-cnpj').textContent = ci.cnpj;
+            document.getElementById('receipt-store-message').textContent = ci.receiptMessage;
+
             document.getElementById('receipt-date').textContent = formatDateTime(saleData.date);
             document.getElementById('receipt-sale-id').textContent = saleData.id;
             document.getElementById('receipt-shift-id').textContent = currentShift.id;
@@ -1093,6 +1254,25 @@ Qual a quantidade a adicionar?`);
         function closeReceiptModal() {
             receiptModal.querySelector('div').classList.remove('scale-100');
             setTimeout(() => receiptModal.classList.add('hidden'), 200);
+        }
+
+        async function handleOpenDrawer() {
+            // This function sends a request to a local service that you would need to create.
+            // This service would be responsible for sending the actual command to the cash drawer.
+            try {
+                const response = await fetch('http://localhost:9100/open-drawer', { method: 'POST' });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                showModal('Comando Enviado', 'Um comando para abrir a gaveta foi enviado.');
+            } catch (error) {
+                console.error('Error opening cash drawer:', error);
+                showModal(
+                    'Erro de Comunicação',
+                    'Não foi possível comunicar com o serviço local da gaveta.',
+                    'Verifique se o programa da gaveta está rodando e se a porta está correta (Ex: http://localhost:9100).'
+                );
+            }
         }
 
         // --- OUTRAS LÓGICAS ---
@@ -1152,6 +1332,8 @@ Qual a quantidade a adicionar?`);
         
         async function handleAddProduct(event) {
             event.preventDefault();
+            if (!auth.currentUser) return;
+
             const sku = document.getElementById('new-sku').value.trim();
             const barcode = document.getElementById('new-barcode').value.trim();
             const name = document.getElementById('new-name').value.trim();
@@ -1171,7 +1353,7 @@ Qual a quantidade a adicionar?`);
                 return;
             }
 
-            const newProduct = { sku, barcode, name, price, stock, minStock };
+            const newProduct = { sku, barcode, name, price, stock, minStock, usuarioId: auth.currentUser.uid };
 
             try {
                 const docRef = await addDoc(collection(db, "products"), newProduct);
@@ -1245,10 +1427,7 @@ Qual a quantidade a adicionar?`);
 
             const product = products.find(p => p.barcode === barcode.trim());
             if (product) {
-                const quantityStr = prompt(`Produto encontrado: ${product.name}
-Estoque atual: ${product.stock}
-
-Qual a quantidade a adicionar?`);
+                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
                     await updateProductStock(product.id, quantity);
@@ -1256,8 +1435,7 @@ Qual a quantidade a adicionar?`);
                     showModal('Erro', 'Quantidade inválida.');
                 }
             } else {
-                if (confirm(`Produto com código de barras "${barcode}" não encontrado.
-Deseja cadastrá-lo agora?`)) {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
                     changeTab('inventory');
                     document.getElementById('new-barcode').value = barcode.trim();
                     document.getElementById('new-sku').focus();
@@ -1356,6 +1534,7 @@ Deseja cadastrá-lo agora?`)) {
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
             document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
             document.getElementById('close-receipt-button').addEventListener('click', closeReceiptModal);
+            document.getElementById('open-drawer-button').addEventListener('click', handleOpenDrawer);
 
             // --- Event Delegation for Dynamic Content ---
             document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
@@ -1380,6 +1559,12 @@ Deseja cadastrá-lo agora?`)) {
 
             contentCustomers.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-customer-form') handleAddCustomer(e);
+            });
+
+            // NEW: Settings event listeners
+            contentSettings.addEventListener('submit', function(e) {
+                if (e.target.id === 'company-info-form') handleSaveCompanyInfo(e);
+                if (e.target.id === 'add-operator-form') handleAddOperator(e);
             });
 
             paymentModal.addEventListener('click', (e) => {
