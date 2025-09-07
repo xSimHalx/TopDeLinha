@@ -11,33 +11,28 @@
     <link rel="stylesheet" href="style.css">
     <style>
         @media print {
-            body * {
-                visibility: hidden;
-            }
-            #receipt-modal, #receipt-modal * {
-                visibility: visible;
+            body > *:not(#receipt-modal) {
+                display: none;
             }
             #receipt-modal {
                 position: absolute;
-                left: 0;
                 top: 0;
+                left: 0;
                 width: 100%;
                 height: 100%;
-                display: flex;
-                align-items: flex-start;
-                justify-content: center;
+                display: block;
                 background-color: white;
                 padding: 0;
             }
+            .non-printable {
+                display: none !important;
+            }
             #receipt-content {
-                width: 300px; /* Typical thermal printer width */
-                margin: 0;
+                width: 300px;
+                margin: 0 auto;
                 border: none;
                 box-shadow: none;
                 font-family: 'Courier New', Courier, monospace;
-            }
-            .non-printable {
-                display: none;
             }
         }
     </style>
