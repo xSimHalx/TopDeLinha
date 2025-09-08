@@ -147,6 +147,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
             if (tabName === 'customers') renderCustomersTab();
             if (tabName === 'activities') renderActivityTab();
             if (tabName === 'settings') renderSettingsTab();
+            if (tabName === 'inventory') {
+                setTimeout(() => {
+                    document.getElementById('inventory-barcode-input').focus();
+                }, 0);
+            }
             if (tabName === 'pdv') {
                 startNewSale();
             }
@@ -272,6 +277,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                 });
             } catch (error) {
                 console.error("Erro ao registrar atividade no log:", error);
+                showModal("Erro de Log", "Não foi possível registrar a atividade. Verifique a sua conexão ou as regras do Firestore.");
             }
         }
 
@@ -333,11 +339,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 
         function renderPdvTab() {
             contentPdv.innerHTML = `
-                 <div id="pdv-idle-screen" class="text-center py-20">
+                 <div id="pdv-idle-screen" class="text-center py-20 hidden">
                     <h2 class="mt-4 text-2xl font-bold text-gray-700">Caixa Livre</h2>
                     <button id="start-sale-button" class="mt-6 bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg">Iniciar Nova Venda</button>
                 </div>
-                <div id="pdv-active-sale" class="grid grid-cols-1 lg:grid-cols-2 gap-8 hidden">
+                <div id="pdv-active-sale" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div>
                         <div class="mb-6">
                             <label for="barcode-input-field" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
@@ -358,10 +364,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
             `;
             renderProductList();
             renderCart();
+            document.getElementById('barcode-input-field').focus();
         }
 
         function renderInventoryTab() {
-             contentInventory.innerHTML = `
+            contentInventory.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                         <div class="mb-8">
@@ -426,7 +433,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -641,7 +651,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         window.handleUndoActivity = async function(encodedLog) {
             const log = JSON.parse(atob(encodedLog));
             
-            if (!confirm(`Tem certeza que deseja desfazer esta ação?\n\nTipo: ${log.type.replace(/_/g, ' ')}`)) {
+            if (!confirm(`Tem certeza que deseja desfazer esta ação?
+
+Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 return;
             }
 
@@ -716,7 +728,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
             if (!currentDay || !currentDay.id) return;
             try {
                 const dayRef = doc(db, "operating_days", currentDay.id);
-                await updateDoc(dayRef, JSON.parse(JSON.stringify(currentDay)));
+                // Explicitly update the shifts array to ensure sales are persisted
+                // Use JSON.parse(JSON.stringify()) for a deep copy to ensure Firestore compatibility
+                await updateDoc(dayRef, {
+            shifts: JSON.parse(JSON.stringify(currentDay.shifts)),
+            status: currentDay.status // Add this line
+        });
             } catch (error) {
                 console.error("Erro ao atualizar o dia no Firestore:", error);
                 showModal("Erro de Sincronização", "Não foi possível salvar as alterações do dia. Verifique a conexão.");
@@ -797,6 +814,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
             currentShift = null;
             
             await updateCurrentDayInFirestore();
+            await logActivity('TURNO_FECHADO', {
+                shiftId: shiftInDay.id,
+                startTime: shiftInDay.startTime,
+                endTime: shiftInDay.endTime,
+                openedBy: shiftInDay.openedBy,
+                closedBy: shiftInDay.closedBy,
+                totalSales: shiftInDay.sales.reduce((sum, sale) => sum + sale.total, 0)
+            }, closedBy);
             renderCashRegisterTab();
             updateCashRegisterStatus();
             showModal('Turno Fechado', 'O próximo operador pode iniciar um novo turno ou o dia pode ser fechado.');
@@ -815,6 +840,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                 currentShift = null;
                 await loadInitialData();
                 
+                await logActivity('DIA_FECHADO', {
+                    dayId: currentDay.id,
+                    date: currentDay.date,
+                    initialCash: currentDay.initialCash,
+                    totalSales: currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0),
+                    totalDebtPayments: currentDay.shifts.flatMap(s => s.debtPayments).reduce((sum, p) => sum + p.amount, 0)
+                }, currentShift ? currentShift.openedBy : 'Sistema'); // Use 'Sistema' if no shift is active
+
                 renderCashRegisterTab();
                 updateCashRegisterStatus();
                 renderReportsTab();
@@ -997,8 +1030,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         function resetPdv() {
             cart = [];
             renderCart();
-            document.getElementById('pdv-idle-screen').classList.remove('hidden');
-            document.getElementById('pdv-active-sale').classList.add('hidden');
+            document.getElementById('barcode-input-field').focus();
         }
 
         function startNewSale() {
@@ -1174,9 +1206,18 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                 saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
             }
 
-            saleInProgress.id = (currentShift.sales.length + 1);
+            // Find the current active shift within currentDay.shifts
+            const activeShift = currentDay.shifts.find(s => !s.endTime);
+            if (!activeShift) {
+                showModal('Erro', 'Nenhum turno ativo encontrado para registrar a venda.');
+                return;
+            }
+
+            saleInProgress.id = (activeShift.sales.length + 1);
             saleInProgress.date = new Date().toISOString();
-            currentShift.sales.push(saleInProgress);
+            activeShift.sales.push(saleInProgress); // Push to the found active shift
+
+            await updateCurrentDayInFirestore(); // Persist sales immediately
 
             // Update stock in Firestore
             for(const cartItem of saleInProgress.items) {
@@ -1406,7 +1447,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 
             const product = products.find(p => p.barcode === barcode.trim());
             if (product) {
-                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+                const quantityStr = prompt(`Produto encontrado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
                     await updateProductStock(product.id, quantity);
@@ -1414,7 +1458,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                     showModal('Erro', 'Quantidade inválida.');
                 }
             } else {
-                if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.
+Deseja cadastrá-lo agora?`)) {
                     changeTab('inventory');
                     document.getElementById('new-barcode').value = barcode.trim();
                     document.getElementById('new-sku').focus();
