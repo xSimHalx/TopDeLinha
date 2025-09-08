@@ -1246,7 +1246,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         }
 
         function printReceipt() {
-            handleOpenDrawer(true); // Tenta abrir a gaveta silenciosamente
             window.print();
         }
 
