@@ -533,6 +533,12 @@ Qual a quantidade a adicionar?`);
                         case 'CLIENTE_DESFEITO':
                             detailsText = `Ação de adicionar o cliente "${log.details.customerName}" foi desfeita.`;
                             break;
+                        case 'TURNO_FECHADO':
+                            detailsText = `Turno #${log.details.shiftId} fechado por ${log.details.closedBy}. Vendas: ${formatCurrency(log.details.totalSales)}.`;
+                            break;
+                        case 'DIA_FECHADO':
+                            detailsText = `Dia de operação fechado. Vendas totais: ${formatCurrency(log.details.totalSales)}. Fundo inicial: ${formatCurrency(log.details.initialCash)}.`;
+                            break;
                         default:
                             detailsText = JSON.stringify(log.details);
                     }
