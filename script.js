@@ -1,4 +1,4 @@
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
       import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
       import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 
@@ -33,7 +33,6 @@
         let currentDay = null;
         let currentShift = null;
         let saleInProgress = {};
-        let html5QrcodeScanner = null;
         let selectedPaymentMethod = 'Dinheiro';
         let salesChart = null;
         let settings = {}; // NEW: To store settings
@@ -56,7 +55,6 @@
         const paymentModal = document.getElementById('payment-modal');
         const confirmSaleButton = document.getElementById('confirm-sale-button');
         const addPaymentForm = document.getElementById('add-payment-form');
-        const scannerModal = document.getElementById('scanner-modal');
         const editCustomerModal = document.getElementById('edit-customer-modal');
         const debtPaymentModal = document.getElementById('debt-payment-modal');
         const receiptModal = document.getElementById('receipt-modal');
@@ -148,7 +146,10 @@
             if (tabName === 'reports') renderReportsTab();
             if (tabName === 'customers') renderCustomersTab();
             if (tabName === 'activities') renderActivityTab();
-            if (tabName === 'settings') renderSettingsTab(); // NEW
+            if (tabName === 'settings') renderSettingsTab();
+            if (tabName === 'pdv') {
+                startNewSale();
+            }
         }
         
         // --- RENDERIZAÇÃO GERAL E INICIALIZAÇÃO ---
@@ -366,11 +367,8 @@
                         <div class="mb-8">
                             <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
                             <div class="bg-gray-50 p-6 rounded-lg">
-                                <p class="text-gray-600 mb-4 text-center">Use a câmera para escanear o código de barras:</p>
-                                <button id="scan-inventory-button" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M3 6h18"></path><path d="M3 10h18"></path><path d="M3 14h18"></path><path d="M3 18h18"></svg>
-                                    Escanear com a Câmera
-                                </button>
+                                <label for="inventory-barcode-input" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
+                                <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
                                 <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
                                 <input type="text" id="inventory-search-input" onkeyup="handleInventorySearch(event)" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
                                 <div id="inventory-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
@@ -1248,6 +1246,7 @@
         }
 
         function printReceipt() {
+            handleOpenDrawer(true); // Tenta abrir a gaveta silenciosamente
             window.print();
         }
 
@@ -1256,7 +1255,7 @@
             setTimeout(() => receiptModal.classList.add('hidden'), 200);
         }
 
-        async function handleOpenDrawer() {
+        async function handleOpenDrawer(silent = false) {
             // This function sends a request to a local service that you would need to create.
             // This service would be responsible for sending the actual command to the cash drawer.
             try {
@@ -1264,14 +1263,20 @@
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                showModal('Comando Enviado', 'Um comando para abrir a gaveta foi enviado.');
+                if (!silent) {
+                    showModal('Comando Enviado', 'Um comando para abrir a gaveta foi enviado.');
+                }
             } catch (error) {
                 console.error('Error opening cash drawer:', error);
-                showModal(
-                    'Erro de Comunicação',
-                    'Não foi possível comunicar com o serviço local da gaveta.',
-                    'Verifique se o programa da gaveta está rodando e se a porta está correta (Ex: http://localhost:9100).'
-                );
+                // Only show error modal if not in silent mode.
+                // The console error is enough for debugging when printing.
+                if (!silent) {
+                    showModal(
+                        'Erro de Comunicação',
+                        'Não foi possível comunicar com o serviço local da gaveta.',
+                        'Verifique se o programa da gaveta está rodando e se a porta está correta (Ex: http://localhost:9100).'
+                    );
+                }
             }
         }
 
@@ -1397,32 +1402,7 @@
             }
         }
 
-        function startInventoryScan() {
-            scannerModal.classList.remove('hidden');
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess) 
-            .catch(err => {
-                console.error("Erro ao iniciar o scanner", err);
-                showModal("Erro de Câmera", "Não foi possível aceder à câmera. Verifique as permissões do navegador.");
-                stopInventoryScan();
-            });
-        }
-
-        function stopInventoryScan() {
-            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-                html5QrcodeScanner.stop().catch(err => console.error("Erro ao parar scanner.", err));
-            }
-            scannerModal.classList.add('hidden');
-        }
-
-        function onScanSuccess(decodedText, decodedResult) {
-            stopInventoryScan();
-            handleInventoryScanResult(decodedText);
-        }
-
-        async function handleInventoryScanResult(barcode) {
+        async function handleInventoryBarcode(barcode) {
             if (!barcode || barcode.trim() === '') return;
 
             const product = products.find(p => p.barcode === barcode.trim());
@@ -1529,7 +1509,7 @@
             forgotPasswordLink.addEventListener('click', handleForgotPassword);
             addPaymentForm.addEventListener('submit', handleAddPayment);
             confirmSaleButton.addEventListener('click', confirmSale);
-            document.getElementById('stop-scanner-button')?.addEventListener('click', stopInventoryScan);
+            
             document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
             document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
@@ -1553,8 +1533,12 @@
             contentInventory.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-product-form') handleAddProduct(e);
             });
-            contentInventory.addEventListener('click', function(e) {
-                if (e.target.id === 'scan-inventory-button') startInventoryScan(e);
+            contentInventory.addEventListener('keypress', function(e) {
+                if (e.target.id === 'inventory-barcode-input' && e.key === 'Enter') {
+                    e.preventDefault();
+                    handleInventoryBarcode(e.target.value.trim());
+                    e.target.value = '';
+                }
             });
 
             contentCustomers.addEventListener('submit', function(e) {
