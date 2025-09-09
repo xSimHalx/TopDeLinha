@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <link rel="stylesheet" href="style.css">
     <style>
         @media print {
@@ -394,6 +395,22 @@
                     <button id="close-receipt-button" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
                     <button id="print-receipt-button" type="button" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">Imprimir</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barcode Scanner Modal -->
+    <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Escanear Código de Barras</h3>
+                <button onclick="closeScannerModal()" class="text-gray-400 hover:text-gray-600 font-bold py-1 px-2 rounded">&times;</button>
+            </div>
+            <div class="p-4">
+                <div id="reader" width="100%"></div>
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end">
+                <button onclick="closeScannerModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
             </div>
         </div>
     </div>

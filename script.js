@@ -26,9 +26,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
       }
 
       // --- BASE DE DADOS (Agora serão carregados do Firebase) ---
-        let products = [];
+        export let products = [];
         let customers = [];
-        let cart = [];
+        export let cart = [];
         let closedDays = [];
         let currentDay = null;
         let currentShift = null;
@@ -36,6 +36,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         let selectedPaymentMethod = 'Dinheiro';
         let salesChart = null;
         let settings = {}; // NEW: To store settings
+        let html5QrcodeScanner = null;
 
         // --- ELEMENTOS DO DOM ---
         const loginScreen = document.getElementById('login-screen');
@@ -60,7 +61,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         const receiptModal = document.getElementById('receipt-modal');
 
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
-        const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
         window.showModal = function(title, message, warningMessage = '') {
@@ -117,18 +118,20 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         }
 
         onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                loginScreen.classList.add('hidden');
-                mainApp.classList.remove('hidden');
-                mainApp.classList.add('flex');
-                await loadInitialData(); // Carrega os dados APÓS o login
-                renderAll();
-            } else {
-                loginScreen.classList.remove('hidden');
-                mainApp.classList.add('hidden');
-                mainApp.classList.remove('flex');
-            }
-        });
+    if (loginScreen && mainApp) { // Adicionado verificação para evitar erro em testes
+        if (user) {
+            loginScreen.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            mainApp.classList.add('flex');
+            await loadInitialData(); // Carrega os dados APÓS o login
+            renderAll();
+        } else {
+            loginScreen.classList.remove('hidden');
+            mainApp.classList.add('hidden');
+            mainApp.classList.remove('flex');
+        }
+    }
+});
 
 
         // --- LÓGICA DAS ABAS ---
@@ -1044,10 +1047,13 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
 
         // --- LÓGICA DE VENDA E PAGAMENTO ---
-        function resetPdv() {
-            cart = [];
+        export function resetPdv() {
+            cart.length = 0; // Modify the array in place
             renderCart();
-            document.getElementById('barcode-input-field').focus();
+            const barcodeInput = document.getElementById('barcode-input-field');
+            if (barcodeInput) {
+                barcodeInput.focus();
+            }
         }
 
         function startNewSale() {
@@ -1073,7 +1079,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             }
         }
 
-        function addToCart(sku) {
+        export function addToCart(sku) {
             const product = products.find(p => p.sku === sku);
 
             if (!product) {
@@ -1123,7 +1129,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             cartTotalEl.textContent = formatCurrency(total);
         }
 
-        window.updateCartQuantity = function(sku, change) {
+        export function updateCartQuantity(sku, change) {
             const cartItem = cart.find(item => item.sku === sku);
             if (!cartItem) return;
             if (change > 0) {
@@ -1134,7 +1140,12 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 }
             }
             cartItem.quantity += change;
-            if (cartItem.quantity <= 0) cart = cart.filter(item => item.sku !== sku);
+            if (cartItem.quantity <= 0) {
+                const itemIndex = cart.findIndex(item => item.sku === sku);
+                if (itemIndex > -1) {
+                    cart.splice(itemIndex, 1);
+                }
+            }
             if (cart.length === 0) resetPdv();
             renderCart();
         }
@@ -1635,4 +1646,6 @@ Deseja cadastrá-lo agora?`)) {
                     }
                 }
             });
+
+            window.updateCartQuantity = updateCartQuantity;
         });
