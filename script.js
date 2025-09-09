@@ -375,7 +375,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                             <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
                             <div class="bg-gray-50 p-6 rounded-lg">
                                 <label for="inventory-barcode-input" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
-                                <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                                <div class="flex items-center gap-2 mt-1">
+                                    <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                                    <button type="button" onclick="triggerInventoryScan()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
+                                </div>
                                 <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
                                 <input type="text" id="inventory-search-input" onkeyup="handleInventorySearch(event)" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
                                 <div id="inventory-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
@@ -769,7 +772,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             }
 
             const dayData = { 
-                date: new Date().toISOString(), 
+                date: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), 
                 initialCash, 
                 shifts: [], 
                 status: 'open',
@@ -808,6 +811,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
         }
 
         async function handleCloseShift() {
+            await loadInitialData(); // Ensure currentDay is up-to-date
             if (!currentShift) return;
             const closedBy = document.getElementById('closing-user').value;
             
@@ -834,6 +838,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
         }
         
         async function handleCloseDay() {
+            await loadInitialData(); // Ensure currentDay is up-to-date
             if (!currentDay || currentShift) {
                 showModal('Ação Inválida', 'Feche o turno atual antes de fechar o dia.');
                 return;
@@ -841,18 +846,22 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             currentDay.status = 'closed';
 
             try {
+                // Capture data needed for logging before nulling currentDay/currentShift
+                const dayToLog = { ...currentDay }; // Create a copy
+                const shiftToLog = currentShift ? { ...currentShift } : null; // Create a copy if exists
+
                 await updateCurrentDayInFirestore();
                 currentDay = null;
                 currentShift = null;
                 await loadInitialData();
                 
                 await logActivity('DIA_FECHADO', {
-                    dayId: currentDay.id,
-                    date: currentDay.date,
-                    initialCash: currentDay.initialCash,
-                    totalSales: currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0),
-                    totalDebtPayments: currentDay.shifts.flatMap(s => s.debtPayments).reduce((sum, p) => sum + p.amount, 0)
-                }, currentShift ? currentShift.openedBy : 'Sistema'); // Use 'Sistema' if no shift is active
+                    dayId: dayToLog.id,
+                    date: dayToLog.date,
+                    initialCash: dayToLog.initialCash,
+                    totalSales: dayToLog.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0),
+                    totalDebtPayments: dayToLog.shifts.flatMap(s => s.debtPayments).reduce((sum, p) => sum + p.amount, 0)
+                }, shiftToLog ? shiftToLog.openedBy : 'Sistema'); // Use 'Sistema' if no shift is active
 
                 renderCashRegisterTab();
                 updateCashRegisterStatus();
@@ -861,8 +870,10 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 changeTab('reports');
             } catch (error) {
                 console.error("Erro ao fechar o dia:", error);
-                showModal("Erro de Base de Dados", "Não foi possível salvar o relatório do dia. Por favor, tente novamente.");
-                currentDay.status = 'open';
+                showModal("Erro de Base de Dados", `Não foi possível salvar o relatório do dia. Por favor, tente novamente. Detalhes: ${error.message || error}`);
+                if (currentDay) { // Only revert status if currentDay is not null
+                    currentDay.status = 'open';
+                }
             }
         }
 
@@ -1550,6 +1561,13 @@ Deseja cadastrá-lo agora?`)) {
                 container.innerHTML = reportsHTML;
             }
         }
+
+        window.triggerInventoryScan = function() {
+            const barcode = prompt("Por favor, insira o código de barras para escanear:");
+            if (barcode) {
+                handleInventoryBarcode(barcode.trim());
+            }
+        };
 
         // --- INICIALIZAÇÃO E EVENTOS ---
         document.addEventListener('DOMContentLoaded', () => {
