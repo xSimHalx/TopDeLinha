@@ -380,7 +380,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                                 <label for="inventory-barcode-input" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
                                 <div class="flex items-center gap-2 mt-1">
                                     <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
-                                    <button type="button" onclick="triggerInventoryScan()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
+                                    <button type="button" id="inventory-scan-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
                                 </div>
                                 <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
                                 <input type="text" id="inventory-search-input" onkeyup="handleInventorySearch(event)" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
@@ -408,7 +408,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                         </div>
                     </div>
                 </div>
-            `;
+            `
             renderInventoryManagement();
         }
 
@@ -1573,12 +1573,82 @@ Deseja cadastrá-lo agora?`)) {
             }
         }
 
-        window.triggerInventoryScan = function() {
-            const barcode = prompt("Por favor, insira o código de barras para escanear:");
-            if (barcode) {
-                handleInventoryBarcode(barcode.trim());
-            }
-        };
+        // --- BARCODE SCANNER LOGIC ---
+
+const scannerModal = document.getElementById('scanner-modal');
+
+// Function to be called on successful scan
+function onScanSuccess(decodedText, decodedResult, successCallback) {
+    console.log(`Code matched = ${decodedText}`, decodedResult);
+    
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(error => {
+            console.error("Failed to clear html5QrcodeScanner.", error);
+        });
+        html5QrcodeScanner = null;
+    }
+    
+    scannerModal.classList.add('hidden');
+
+    if(successCallback) {
+        successCallback(decodedText);
+    }
+}
+
+// Function to close the scanner modal manually
+window.closeScannerModal = function() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(error => {
+            console.error("Failed to clear html5QrcodeScanner.", error);
+        });
+        html5QrcodeScanner = null;
+    }
+    scannerModal.classList.add('hidden');
+}
+
+// Generic function to start the scanner
+function startScanner(successCallback) {
+    scannerModal.classList.remove('hidden');
+
+    // The library is loaded globally, so we can use it directly.
+    // We create a new instance every time to ensure the camera is requested.
+    html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", 
+        { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            supportedScanTypes: [
+                Html5QrcodeScanType.SCAN_TYPE_CAMERA
+            ]
+        },
+        /* verbose= */ false
+    );
+    
+    html5QrcodeScanner.render((decodedText, decodedResult) => onScanSuccess(decodedText, decodedResult, successCallback), (errorMessage) => {
+        // console.warn(`Code scan error = ${errorMessage}`);
+    });
+}
+
+// Specific callback for PDV scan
+function onPdvScanSuccess(decodedText) {
+    handleBarcodeScan(decodedText);
+    const barcodeInput = document.getElementById('barcode-input-field');
+    if(barcodeInput) {
+        barcodeInput.value = decodedText;
+    }
+}
+
+// Specific callback for Inventory scan
+function onInventoryScanSuccess(decodedText) {
+    handleInventoryBarcode(decodedText);
+    const inventoryBarcode = document.getElementById('inventory-barcode-input');
+    if(inventoryBarcode) {
+        inventoryBarcode.value = decodedText;
+        inventoryBarcode.focus();
+    }
+}
+
+// --- END BARCODE SCANNER LOGIC ---
 
         // --- INICIALIZAÇÃO E EVENTOS ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -1604,6 +1674,9 @@ Deseja cadastrá-lo agora?`)) {
             contentPdv.addEventListener('click', function(e) {
                 if (e.target.id === 'start-sale-button') startNewSale(e);
                 if (e.target.id === 'checkout-button') handleCheckout(e);
+                if (e.target.id === 'open-scanner-button') {
+                    startScanner(onPdvScanSuccess);
+                }
             });
             contentPdv.addEventListener('keypress', function(e) {
                 if (e.target.id === 'barcode-input-field') handleBarcodeKeypress(e);
@@ -1611,6 +1684,11 @@ Deseja cadastrá-lo agora?`)) {
 
             contentInventory.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-product-form') handleAddProduct(e);
+            });
+            contentInventory.addEventListener('click', function(e) {
+                if (e.target.id === 'inventory-scan-button') {
+                    startScanner(onInventoryScanSuccess);
+                }
             });
             contentInventory.addEventListener('keypress', function(e) {
                 if (e.target.id === 'inventory-barcode-input' && e.key === 'Enter') {
