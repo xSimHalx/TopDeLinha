@@ -1362,7 +1362,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 infoDiv.innerHTML = `<p class="font-bold">${product.name}</p><p class="text-gray-600">${formatCurrency(product.price)}</p>`;
                 
                 const addButton = document.createElement('button');
-                addButton.textContent = 'Add';
+                addButton.textContent = 'Adicionar ao Carrinho';
                 addButton.className = `mt-3 w-full text-sm font-bold py-2 rounded-md ${productInStock ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-300 cursor-not-allowed'}`;
                 addButton.disabled = !productInStock;
                 
