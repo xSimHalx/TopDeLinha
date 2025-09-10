@@ -288,6 +288,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 
 const releaseNotes = [
     {
+        version: '1.3.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionado filtro de data na aba de relatórios.',
+            'Alterada a ordem de exibição do log de atividades para mostrar os itens mais recentes primeiro.'
+        ]
+    },
+    {
         version: '1.2.1',
         date: '10/09/2025',
         notes: [
@@ -534,11 +542,138 @@ Qual a quantidade a adicionar?`);
         
         function renderReportsTab() {
             contentReports.innerHTML = `
-                <h3 class="font-semibold text-xl text-gray-700 mb-4">Histórico de Dias de Operação</h3>
+                <div class="flex flex-wrap items-end gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+                    <div>
+                        <label for="report-start-date" class="block text-sm font-medium text-gray-700">Data de Início</label>
+                        <input type="date" id="report-start-date" class="mt-1 block w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="report-end-date" class="block text-sm font-medium text-gray-700">Data Final</label>
+                        <input type="date" id="report-end-date" class="mt-1 block w-full p-2 border rounded-md">
+                    </div>
+                    <button id="filter-reports-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Filtrar</button>
+                    <button id="clear-filter-button" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg">Limpar</button>
+                </div>
                 <div id="session-reports-container" class="space-y-6">
+                    <!-- Reports will be rendered here -->
                 </div>
             `;
-            renderSessionReports();
+            displayFilteredReports(closedDays); // Display all reports initially
+
+            document.getElementById('filter-reports-button').addEventListener('click', handleFilterReports);
+            document.getElementById('clear-filter-button').addEventListener('click', () => {
+                document.getElementById('report-start-date').value = '';
+                document.getElementById('report-end-date').value = '';
+                displayFilteredReports(closedDays);
+            });
+        }
+
+        function handleFilterReports() {
+            const startDateInput = document.getElementById('report-start-date').value;
+            const endDateInput = document.getElementById('report-end-date').value;
+
+            if (!startDateInput || !endDateInput) {
+                showModal("Datas Inválidas", "Por favor, selecione a data de início e a data final para filtrar.");
+                return;
+            }
+
+            const parsePtBrDate = (dateStr) => {
+                const [datePart] = dateStr.split(',');
+                const [day, month, year] = datePart.split('/');
+                return new Date(year, month - 1, day);
+            };
+
+            const startDate = new Date(startDateInput);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(endDateInput);
+            endDate.setHours(23, 59, 59, 999);
+
+            const filtered = closedDays.filter(day => {
+                const dayDate = parsePtBrDate(day.date);
+                return dayDate >= startDate && dayDate <= endDate;
+            });
+
+            displayFilteredReports(filtered);
+        }
+
+        function displayFilteredReports(daysToDisplay) {
+            const container = document.getElementById('session-reports-container');
+            if (!container) return;
+
+            if (daysToDisplay.length === 0) {
+                container.innerHTML = `<p id="no-sessions-message" class="text-gray-500 text-center py-8">Nenhum relatório encontrado para o período selecionado.</p>`;
+                return;
+            }
+            
+            let reportsHTML = '';
+            daysToDisplay.slice().reverse().forEach(day => {
+                const allSales = day.shifts.flatMap(s => s.sales);
+                const allDebtPayments = day.shifts.flatMap(s => s.debtPayments);
+                const totalSalesValue = allSales.reduce((sum, sale) => sum + sale.total, 0);
+                const paymentsSummary = allSales.flatMap(s => s.payments).reduce((acc, p) => {
+                    acc[p.method] = (acc[p.method] || 0) + p.amount;
+                    return acc;
+                }, {});
+                const totalCashInFromSales = (paymentsSummary['Dinheiro'] || 0);
+                const totalCashInFromDebts = allDebtPayments.filter(p => p.method === 'Dinheiro').reduce((sum, p) => sum + p.amount, 0);
+                const expectedCashInDrawer = day.initialCash + totalCashInFromSales + totalCashInFromDebts;
+
+                let shiftsDetailsHTML = day.shifts.map(shift => {
+                    const shiftTotal = shift.sales.reduce((sum, s) => sum + s.total, 0);
+                    return (
+            `<div class="ml-4 mt-2 p-2 bg-white rounded border">
+                <p class="font-semibold">Turno #${shift.id}</p>
+                <p class="text-xs text-gray-500">Operadores: ${shift.openedBy} (Abertura) / ${shift.closedBy} (Fecho)</p>
+                <p class="text-xs text-gray-500">Período: ${formatDateTime(shift.startTime)} - ${formatDateTime(shift.endTime)}</p>
+                <p class="text-sm">Vendas no turno: ${formatCurrency(shiftTotal)}</p>
+            </div>`
+                    )
+                }).join('');
+
+                let debtPaymentsHTML = allDebtPayments.length > 0 ? allDebtPayments.map(p => (
+            `<div class="flex justify-between text-sm"><span>${p.customerName}</span> <span>${formatCurrency(p.amount)} (${p.method})</span></div>`
+                )).join('') : '<span>Nenhum recebimento no dia.</span>';
+
+                reportsHTML += (
+            `<details class="bg-gray-50 p-4 rounded-lg border">
+                <summary class="cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-bold text-lg">Relatório do Dia: ${day.date.split(',')[0]}</p>
+                            <p class="text-sm text-gray-600">ID do Dia: #${day.id}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm">Total de Vendas do Dia</p>
+                            <p class="font-bold text-xl">${formatCurrency(totalSalesValue)}</p>
+                        </div>
+                    </div>
+                </summary>
+                <div class="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="font-semibold">Resumo Financeiro do Dia</p>
+                        <div class="text-sm mt-2 space-y-1">
+                            <div class="flex justify-between"><span>Fundo de Troco Inicial:</span> <span>${formatCurrency(day.initialCash)}</span></div>
+                            ${Object.entries(paymentsSummary).map(([method, amount]) => `<div class="flex justify-between"><span>Total em ${method}:</span> <span>${formatCurrency(amount)}</span></div>`).join('')}
+                            <div class="flex justify-between font-bold mt-2 pt-2 border-t">
+                                <span>Esperado em Dinheiro (Final):</span>
+                                <span>${formatCurrency(expectedCashInDrawer)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="font-semibold">Recebimentos de Dívidas</p>
+                        <div class="text-sm mt-2 space-y-1">${debtPaymentsHTML}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="font-semibold mt-4">Detalhes dos Turnos (${day.shifts.length})</p>
+                        ${shiftsDetailsHTML}
+                    </div>
+                </div>
+            </details>
+        `
+                );
+            });
+            container.innerHTML = reportsHTML;
         }
 
         async function renderActivityTab() {
@@ -548,9 +683,9 @@ Qual a quantidade a adicionar?`);
             const uid = auth.currentUser.uid;
 
             try {
-                const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "asc"), limit(50));
+                const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "desc"), limit(50));
                 const logSnapshot = await getDocs(q);
-                const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
+                const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 const container = document.getElementById('activities-list-container');
                 if (logs.length === 0) {
@@ -620,6 +755,7 @@ Qual a quantidade a adicionar?`);
                 document.getElementById('activities-list-container').innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
             }
         }
+
 
         // NEW: Settings Tab Logic
         function renderSettingsTab() {
@@ -1561,83 +1697,7 @@ Deseja cadastrá-lo agora?`)) {
             }
         }
         
-        function renderSessionReports() {
-            const container = document.getElementById('session-reports-container');
-            if (!container) return;
-
-            if (closedDays.length === 0) {
-                container.innerHTML = `<p id="no-sessions-message" class="text-gray-500">Nenhum dia de operação foi fechado ainda.</p>`;
-            } else {
-                let reportsHTML = '';
-                closedDays.slice().reverse().forEach(day => {
-                    const allSales = day.shifts.flatMap(s => s.sales);
-                    const allDebtPayments = day.shifts.flatMap(s => s.debtPayments);
-                    const totalSalesValue = allSales.reduce((sum, sale) => sum + sale.total, 0);
-                    const paymentsSummary = allSales.flatMap(s => s.payments).reduce((acc, p) => {
-                        acc[p.method] = (acc[p.method] || 0) + p.amount;
-                        return acc;
-                    }, {});
-                    const totalCashInFromSales = (paymentsSummary['Dinheiro'] || 0);
-                    const totalCashInFromDebts = allDebtPayments.filter(p => p.method === 'Dinheiro').reduce((sum, p) => sum + p.amount, 0);
-                    const expectedCashInDrawer = day.initialCash + totalCashInFromSales + totalCashInFromDebts;
-
-                    let shiftsDetailsHTML = day.shifts.map(shift => {
-                        const shiftTotal = shift.sales.reduce((sum, s) => sum + s.total, 0);
-                        return `
-                        <div class="ml-4 mt-2 p-2 bg-white rounded border">
-                            <p class="font-semibold">Turno #${shift.id}</p>
-                            <p class="text-xs text-gray-500">Operadores: ${shift.openedBy} (Abertura) / ${shift.closedBy} (Fecho)</p>
-                            <p class="text-xs text-gray-500">Período: ${formatDateTime(shift.startTime)} - ${formatDateTime(shift.endTime)}</p>
-                            <p class="text-sm">Vendas no turno: ${formatCurrency(shiftTotal)}</p>
-                        </div>
-                        `
-                    }).join('');
-
-                    let debtPaymentsHTML = allDebtPayments.length > 0 ? allDebtPayments.map(p => `
-                        <div class="flex justify-between text-sm"><span>${p.customerName}</span> <span>${formatCurrency(p.amount)} (${p.method})</span></div>
-                    `).join('') : '<span>Nenhum recebimento no dia.</span>';
-
-                    reportsHTML += `
-                        <details class="bg-gray-50 p-4 rounded-lg border">
-                            <summary class="cursor-pointer">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="font-bold text-lg">Relatório do Dia #${day.id}</p>
-                                        <p class="text-sm text-gray-600">Data: ${formatDateTime(day.date)}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-sm">Total de Vendas do Dia</p>
-                                        <p class="font-bold text-xl">${formatCurrency(totalSalesValue)}</p>
-                                    </div>
-                                </div>
-                            </summary>
-                            <div class="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <p class="font-semibold">Resumo Financeiro do Dia</p>
-                                    <div class="text-sm mt-2 space-y-1">
-                                        <div class="flex justify-between"><span>Fundo de Troco Inicial:</span> <span>${formatCurrency(day.initialCash)}</span></div>
-                                        ${Object.entries(paymentsSummary).map(([method, amount]) => `<div class="flex justify-between"><span>Total em ${method}:</span> <span>${formatCurrency(amount)}</span></div>`).join('')}
-                                        <div class="flex justify-between font-bold mt-2 pt-2 border-t">
-                                            <span>Esperado em Dinheiro (Final):</span>
-                                            <span>${formatCurrency(expectedCashInDrawer)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p class="font-semibold">Recebimentos de Dívidas</p>
-                                    <div class="text-sm mt-2 space-y-1">${debtPaymentsHTML}</div>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <p class="font-semibold mt-4">Detalhes dos Turnos (${day.shifts.length})</p>
-                                    ${shiftsDetailsHTML}
-                                </div>
-                            </div>
-                        </details>
-                    `;
-                });
-                container.innerHTML = reportsHTML;
-            }
-        }
+        
 
         // --- BARCODE SCANNER LOGIC ---
 
