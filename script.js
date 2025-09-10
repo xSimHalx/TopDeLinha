@@ -1612,15 +1612,18 @@ function startScanner(successCallback) {
 
     // The library is loaded globally, so we can use it directly.
     // We create a new instance every time to ensure the camera is requested.
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        videoConstraints: {
+            facingMode: "environment"
+        }
+    };
+
     html5QrcodeScanner = new Html5QrcodeScanner(
         "reader", 
-        { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            supportedScanTypes: [
-                Html5QrcodeScanType.SCAN_TYPE_CAMERA
-            ]
-        },
+        config,
         /* verbose= */ false
     );
     
