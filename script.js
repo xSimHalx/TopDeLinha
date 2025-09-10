@@ -287,6 +287,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.0',
+    date: '10/09/2025',
+    notes: [
+        'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
+    ]
+    },
+    {
     version: '1.4.0',
     date: '10/09/2025',
     notes: [
@@ -415,6 +422,11 @@ function renderDashboardTab() {
                             <label for="barcode-input-field" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
                             <input type="text" id="barcode-input-field" placeholder="Aguardando leitura do código..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
                         </div>
+                        <div class="mb-6">
+                            <label for="product-search-input" class="block text-sm font-medium text-gray-700">Pesquisar Produto por Nome</label>
+                            <input type="text" id="product-search-input" onkeyup="handlePdvProductSearch(event)" placeholder="Digite o nome do produto..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                            <div id="pdv-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
+                        </div>
                         <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-4">Ou adicione manualmente</h3>
                         <div id="product-list" class="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2"></div>
                     </div>
@@ -431,6 +443,35 @@ function renderDashboardTab() {
             renderProductList();
             renderCart();
             document.getElementById('barcode-input-field').focus();
+        }
+
+        window.handlePdvProductSearch = function(event) {
+            const searchTerm = event.target.value.toLowerCase();
+            const resultsContainer = document.getElementById('pdv-search-results');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm));
+
+            if (filteredProducts.length > 0) {
+                resultsContainer.innerHTML = filteredProducts.map(p => `
+                    <div onclick="addPdvProductFromSearch('${p.sku}')" class="p-2 border-b hover:bg-gray-100 cursor-pointer">
+                        <p class="font-semibold">${p.name}</p>
+                        <p class="text-sm text-gray-500">Estoque: ${p.stock}</p>
+                    </div>
+                `).join('');
+            } else {
+                resultsContainer.innerHTML = '<p class="p-2 text-gray-500">Nenhum produto encontrado.</p>';
+            }
+        }
+
+        window.addPdvProductFromSearch = function(sku) {
+            addToCart(sku);
+            document.getElementById('product-search-input').value = '';
+            document.getElementById('pdv-search-results').innerHTML = '';
         }
 
         function renderInventoryTab() {
