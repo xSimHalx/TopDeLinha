@@ -291,6 +291,7 @@ const releaseNotes = [{
     date: '10/09/2025',
     notes: [
         'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
+        'Implementada leitura de códigos de barra de balança (iniciados com \'2\') para extrair SKU e preço.'
     ]
     },
     {
@@ -1303,15 +1304,33 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
         }
         
         function handleBarcodeScan(scannedCode) {
-            const product = products.find(p => p.barcode === scannedCode);
-            if (product) {
-                addToCart(product.sku);
+            // Check for scale barcode (starts with '2')
+            if (scannedCode.startsWith('2') && scannedCode.length >= 12) { // Assuming 12 digits after '2' for SKU and price
+                const skuPart = scannedCode.substring(1, 6); // Digits 1-5 for SKU
+                const pricePart = scannedCode.substring(6, 11); // Digits 6-10 for price
+                const price = parseFloat(pricePart) / 100; // Assuming last two digits are cents
+
+                const product = products.find(p => p.sku === skuPart);
+
+                if (product) {
+                    // Create a temporary product object with the scanned price
+                    const productWithScalePrice = { ...product, price: price };
+                    addToCart(productWithScalePrice.sku, productWithScalePrice.price); // Pass price to addToCart
+                } else {
+                    showModal('Produto da Balança não encontrado', `Nenhum produto corresponde ao SKU '${skuPart}' do código de balança.`);
+                }
             } else {
-                showModal('Produto não encontrado', `Nenhum produto corresponde ao código '${scannedCode}'.`);
+                // Existing logic for regular barcodes
+                const product = products.find(p => p.barcode === scannedCode);
+                if (product) {
+                    addToCart(product.sku);
+                } else {
+                    showModal('Produto não encontrado', `Nenhum produto corresponde ao código '${scannedCode}'.`);
+                }
             }
         }
 
-        export function addToCart(sku) {
+        export function addToCart(sku, scannedPrice = null) { // Added scannedPrice parameter
             const product = products.find(p => p.sku === sku);
 
             if (!product) {
@@ -1328,8 +1347,11 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             }
             if (cartItem) {
                 cartItem.quantity++;
+                if (scannedPrice !== null) { // Update price if provided by scale
+                    cartItem.price = scannedPrice;
+                }
             } else {
-                cart.push({ ...product, quantity: 1 });
+                cart.push({ ...product, quantity: 1, price: scannedPrice !== null ? scannedPrice : product.price }); // Use scannedPrice if available
             }
             renderCart();
         }
