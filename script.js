@@ -417,7 +417,7 @@ function renderDashboardTab() {
                     <button id="start-sale-button" class="mt-6 bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg">Iniciar Nova Venda</button>
                 </div>
                 <div id="pdv-active-sale" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
+                    <div id="pdv-left-column" class="relative">
                         <div class="mb-6">
                             <label for="barcode-input-field" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
                             <input type="text" id="barcode-input-field" placeholder="Aguardando leitura do código..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
@@ -449,7 +449,7 @@ function renderDashboardTab() {
             const searchTerm = event.target.value.toLowerCase();
             const resultsContainer = document.getElementById('pdv-search-results');
             
-            if (searchTerm.length < 2) {
+            if (searchTerm.length === 0) {
                 resultsContainer.innerHTML = '';
                 return;
             }

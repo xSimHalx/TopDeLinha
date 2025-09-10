@@ -37,4 +37,15 @@
             color: #4338ca;
             font-weight: 600;
         }
+        #pdv-search-results {
+            position: absolute;
+            z-index: 10;
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     
