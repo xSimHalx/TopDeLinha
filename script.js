@@ -285,35 +285,84 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         }
 
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
-        function renderDashboardTab() {
-            const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
-            const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
-            const lowStockItems = products.filter(p => p.stock <= p.minStock);
-            const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
 
-            contentDashboard.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="bg-green-50 p-6 rounded-lg border border-green-200">
-                        <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
-                        <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
-                        <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
-                    </div>
-                    <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
-                        <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
-                        <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
-                        <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
-                    </div>
-                    <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
-                        <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
-                        ${lowStockItems.length > 0 ? `
-                            <ul class="mt-2 space-y-1 text-sm">
-                                ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} / min: ${p.minStock}</span></li>`).join('')}
-                            </ul>
-                        ` : '<p class="mt-4 text-center text-gray-500">Nenhum item com estoque baixo.</p>'}
-                    </div>
-                </div>
-            `
-        }
+const releaseNotes = [
+    {
+        version: '1.2.1',
+        date: '10/09/2025',
+        notes: [
+            'Adicionada seção de "Novidades da Versão" ao Painel.',
+            'Corrigido o alerta de estoque baixo no painel para usar o valor mínimo definido por produto.',
+            'Adicionado aviso de estoque mínimo no recibo após a venda.'
+        ]
+    },
+    {
+        version: '1.1.0',
+        date: '09/09/2025',
+        notes: [
+            'Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.',
+            'Tradução de mais elementos da interface para Português (Brasil).'
+        ]
+    },
+    {
+        version: '1.0.0',
+        date: '01/09/2025',
+        notes: [
+            'Lançamento inicial do sistema TopDeLinha PDV.'
+        ]
+    }
+];
+
+function renderReleaseNotes() {
+    const container = document.getElementById('release-notes-container');
+    if (!container) return;
+
+    container.innerHTML = releaseNotes.map(release => `
+        <div class="bg-white p-4 rounded-lg shadow-sm border">
+            <h4 class="font-bold text-lg">Versão ${release.version} <span class="text-sm font-normal text-gray-500">- ${release.date}</span></h4>
+            <ul class="list-disc list-inside mt-2 space-y-1 text-gray-700">
+                ${release.notes.map(note => `<li>${note}</li>`).join('')}
+            </ul>
+        </div>
+    `).join('');
+}
+
+function renderDashboardTab() {
+    const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
+    const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
+    const lowStockItems = products.filter(p => p.stock <= p.minStock);
+    const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
+
+    contentDashboard.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+                <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
+                <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
+                <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
+            </div>
+            <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
+                <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
+                <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
+            </div>
+            <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
+                <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
+                ${lowStockItems.length > 0 ? `
+                    <ul class="mt-2 space-y-1 text-sm max-h-[10vh] overflow-y-auto">
+                        ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} / min: ${p.minStock}</span></li>`).join('')}
+                    </ul>
+                ` : '<p class="mt-4 text-center text-gray-500">Nenhum item com estoque baixo.</p>'}
+            </div>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold text-gray-700 mt-8 mb-4">Novidades da Versão</h3>
+            <div id="release-notes-container" class="space-y-4 max-h-[30vh] overflow-y-auto pr-2">
+                <!-- Release notes will be injected here -->
+            </div>
+        </div>
+    `;
+    renderReleaseNotes();
+}
         
         function renderCashRegisterTab() {
             const userOptions = settings.operators.map(user => `<option value="${user}">${user}</option>`).join('');
