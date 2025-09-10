@@ -286,7 +286,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
-const releaseNotes = [
+const releaseNotes = [{
+    version: '1.4.0',
+    date: '10/09/2025',
+    notes: [
+        'Limites de historico de atividades aumentado, de 50 para 300'
+    ]
+    },    
     {
         version: '1.3.0',
         date: '10/09/2025',
@@ -683,7 +689,7 @@ Qual a quantidade a adicionar?`);
             const uid = auth.currentUser.uid;
 
             try {
-                const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "desc"), limit(50));
+                const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "desc"), limit(300));
                 const logSnapshot = await getDocs(q);
                 const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
