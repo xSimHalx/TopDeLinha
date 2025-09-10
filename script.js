@@ -288,7 +288,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         function renderDashboardTab() {
             const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
             const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
-            const lowStockItems = products.filter(p => p.stock <= 2);
+            const lowStockItems = products.filter(p => p.stock <= p.minStock);
             const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
 
             contentDashboard.innerHTML = `
@@ -304,15 +304,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
                         <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
                     </div>
                     <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
-                        <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo (≤ 2 unidades)</h4>
+                        <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
                         ${lowStockItems.length > 0 ? `
                             <ul class="mt-2 space-y-1 text-sm">
-                                ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} un.</span></li>`).join('')}
+                                ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} / min: ${p.minStock}</span></li>`).join('')}
                             </ul>
                         ` : '<p class="mt-4 text-center text-gray-500">Nenhum item com estoque baixo.</p>'}
                     </div>
                 </div>
-            `;
+            `
         }
         
         function renderCashRegisterTab() {
@@ -1247,11 +1247,15 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             await updateCurrentDayInFirestore(); // Persist sales immediately
 
+            const lowStockProducts = [];
             // Update stock in Firestore
             for(const cartItem of saleInProgress.items) {
                 const productRef = doc(db, "products", cartItem.id);
                 const newStock = cartItem.stock - cartItem.quantity;
                 await updateDoc(productRef, { stock: newStock });
+                if (newStock <= cartItem.minStock) {
+                    lowStockProducts.push(cartItem.name);
+                }
             }
             
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
@@ -1271,10 +1275,14 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             resetPdv();
             closePaymentModal();
             
-            renderReceipt(saleInProgress, change);
+            let warning = '';
+            if (lowStockProducts.length > 0) {
+                warning = `Atenção: ${lowStockProducts.join(', ')} atingiu/atingiram o estoque mínimo.`;
+            }
+            renderReceipt(saleInProgress, change, warning);
         }
 
-        function renderReceipt(saleData, change) {
+        function renderReceipt(saleData, change, warning = '') {
             const ci = settings.companyInfo;
             document.getElementById('receipt-store-name').textContent = ci.name;
             document.getElementById('receipt-store-address').textContent = ci.address;
@@ -1309,6 +1317,15 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             });
 
             document.getElementById('receipt-change').textContent = formatCurrency(change);
+
+            const warningArea = document.getElementById('receipt-warning-area');
+            const warningMessageEl = document.getElementById('receipt-warning-message');
+            if (warning) {
+                warningMessageEl.textContent = warning;
+                warningArea.classList.remove('hidden');
+            } else {
+                warningArea.classList.add('hidden');
+            }
 
             receiptModal.classList.remove('hidden');
             receiptModal.querySelector('div').classList.add('scale-100');
