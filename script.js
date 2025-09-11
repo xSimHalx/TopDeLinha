@@ -287,6 +287,20 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.2',
+    date: '11/09/2025',
+    notes: [
+        'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.'
+    ]
+    },
+    {
+    version: '1.5.1',
+    date: '11/09/2025',
+    notes: [
+        'Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'
+    ]
+    },
+    {
     version: '1.5.0',
     date: '10/09/2025',
     notes: [
@@ -1680,6 +1694,17 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             const sku = document.getElementById('new-sku').value.trim();
             const barcode = document.getElementById('new-barcode').value.trim();
+            // NEW: Barcode validation
+            if (barcode !== '') {
+                if (!/^\d+$/.test(barcode)) {
+                    showModal('Erro de Código de Barras', 'O código de barras deve conter apenas números.');
+                    return;
+                }
+                if (barcode.length !== 13) {
+                    showModal('Erro de Código de Barras', 'O código de barras deve ter 13 dígitos (padrão EAN-13).');
+                    return;
+                }
+            }
             const name = document.getElementById('new-name').value.trim();
             const price = parseFloat(document.getElementById('new-price').value);
             const stock = parseInt(document.getElementById('new-stock').value);
