@@ -434,24 +434,24 @@ function renderDashboardTab() {
 
     contentDashboard.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+            <button onclick="window.goToReportsHoje()" class="bg-green-50 p-6 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors">
                 <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
                 <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
                 <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
-            </div>
-            <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+            </button>
+            <button onclick="window.goToClientesComDivida()" class="bg-orange-50 p-6 rounded-lg border border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors">
                 <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
                 <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
                 <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
-            </div>
-            <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
+            </button>
+            <button onclick="window.goToEstoqueBaixo()" class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2 cursor-pointer hover:bg-red-100 transition-colors">
                 <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
                 ${lowStockItems.length > 0 ? `
                     <ul class="mt-2 space-y-1 text-sm max-h-[10vh] overflow-y-auto">
                         ${lowStockItems.map(p => `<li class="flex justify-between"><span>${p.name}</span> <span class="font-bold text-red-600">${p.stock} / min: ${p.minStock}</span></li>`).join('')}
                     </ul>
                 ` : '<p class="mt-4 text-center text-gray-500">Nenhum item com estoque baixo.</p>'}
-            </div>
+            </button>
         </div>
         <div>
             <h3 class="text-xl font-bold text-gray-700 mt-8 mb-4">Novidades da Versão</h3>
@@ -460,6 +460,57 @@ function renderDashboardTab() {
             </div>
         </div>
     `;
+    // Funções de navegação dos cards
+    window.goToReportsHoje = function () {
+        changeTab('reports');
+        // Preenche filtro para hoje
+        const hoje = new Date();
+        const yyyy = hoje.getFullYear();
+        const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoje.getDate()).padStart(2, '0');
+        const dataHoje = `${yyyy}-${mm}-${dd}`;
+        setTimeout(() => {
+            document.getElementById('report-start-date').value = dataHoje;
+            document.getElementById('report-end-date').value = dataHoje;
+            document.getElementById('filter-reports-button').click();
+        }, 100);
+    };
+    window.goToClientesComDivida = function () {
+        changeTab('customers');
+        setTimeout(() => {
+            // Filtra lista de clientes para mostrar só os com dívida
+            const debtorsListEl = document.getElementById('debtors-list');
+            if (debtorsListEl) {
+                const trs = debtorsListEl.querySelectorAll('tbody tr');
+                trs.forEach(tr => {
+                    const valor = tr.querySelector('td:nth-child(2)').textContent;
+                    if (!valor.includes('-') && !valor.match(/R\$\s*0,00/)) {
+                        tr.style.display = '';
+                    } else {
+                        tr.style.display = 'none';
+                    }
+                });
+            }
+        }, 200);
+    };
+    window.goToEstoqueBaixo = function () {
+        changeTab('inventory');
+        setTimeout(() => {
+            // Filtra lista de produtos para mostrar só os de baixo estoque
+            const tableBody = document.getElementById('inventory-management-table-body');
+            if (tableBody) {
+                const trs = tableBody.querySelectorAll('tr');
+                trs.forEach(tr => {
+                    const estoque = tr.querySelector('td:last-child').textContent;
+                    if (estoque.includes('min:') || estoque.includes('baixo')) {
+                        tr.style.display = '';
+                    } else {
+                        tr.style.display = 'none';
+                    }
+                });
+            }
+        }, 200);
+    };
     renderReleaseNotes();
 }
 
