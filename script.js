@@ -895,7 +895,7 @@ async function renderActivityTab() {
             logsByDay[dia].push(log);
         });
         let html = '';
-        Object.keys(logsByDay).reverse().forEach(dia => {
+        Object.keys(logsByDay).forEach(dia => {
             html += `<h4 class="mt-6 mb-2 text-lg font-bold text-gray-700">${dia}</h4>`;
             html += logsByDay[dia].map(log => {
                 let detailsText = '';
