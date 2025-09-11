@@ -288,6 +288,25 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.8',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',
+    ]
+}, {
+    version: '1.5.7',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.',
+        'Melhorada a robustez da função de atualização de clientes.'
+    ]
+}, {
+    version: '1.5.6',
+    date: '11/09/2025',
+    notes: [
+        'Adicionada opção de pagamento "Fiado" no modal de pagamento.'
+    ]
+}, {
     version: '1.5.5',
     date: '11/09/2025',
     notes: [
@@ -1181,7 +1200,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             const debtorsListEl = document.getElementById('debtors-list');
             if (!debtorsListEl) return;
             
-            const debtors = customers.filter(c => c.id !== 1); // Exclui o cliente padrão
+            const debtors = customers.filter(c => c.id !== '1'); // Exclui o cliente padrão
             const totalDebt = debtors.reduce((sum, c) => sum + (c.debt || 0), 0);
             document.getElementById('total-debt-summary').textContent = formatCurrency(totalDebt);
 
@@ -1297,6 +1316,10 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
         async function handleUpdateCustomer() {
             const customerId = document.getElementById('edit-customer-id').value;
+            if (!customerId) {
+                showModal('Erro de Cliente', 'A ID do cliente não foi encontrada. Não é possível atualizar.');
+                return;
+            }
             const customerRef = doc(db, "customers", customerId);
 
             const name = document.getElementById('edit-customer-name').value.trim();
@@ -1449,7 +1472,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 items: JSON.parse(JSON.stringify(cart)),
                 total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
                 payments: [],
-                customerId: 1,
+                customerId: '1',
             };
             selectedPaymentMethod = 'Dinheiro';
             renderPaymentModal();
@@ -1461,14 +1484,15 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             const total = saleInProgress.total;
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
             const change = totalPaid > total ? totalPaid - total : 0;
-            const customerId = parseInt(document.getElementById('payment-modal-customer-select')?.value || saleInProgress.customerId);
+            const customerId = document.getElementById('payment-modal-customer-select')?.value || saleInProgress.customerId;
             
             document.getElementById('payment-modal-total').textContent = formatCurrency(total);
             document.getElementById('payment-modal-paid-amount').textContent = formatCurrency(totalPaid);
             document.getElementById('payment-modal-change').textContent = formatCurrency(change);
             
             const customerSelect = document.getElementById('payment-modal-customer-select');
-            customerSelect.innerHTML = customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            const customerOptions = customers.filter(c => c.id !== '1').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            customerSelect.innerHTML = `<option value="1">Consumidor</option>${customerOptions}`;
             customerSelect.value = customerId;
 
             document.getElementById('payment-modal-cart-summary').innerHTML = saleInProgress.items.map(i => `<div>${i.quantity}x ${i.name}</div>`).join('');
@@ -1479,7 +1503,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             
             let saleCanBeConfirmed = false;
             if (selectedPaymentMethod === 'Fiado') {
-                saleCanBeConfirmed = customerId !== 1;
+                saleCanBeConfirmed = customerId !== '1';
             } else {
                 saleCanBeConfirmed = totalPaid >= total;
             }
@@ -1595,7 +1619,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 saleId: saleInProgress.id,
                 shiftId: currentShift.id,
                 total: saleInProgress.total,
-                customerName: customer ? customer.name : 'Consumidor Final',
+                customerName: customer ? customer.name : 'Consumidor',
                 items: saleInProgress.items.map(i => `${i.quantity}x ${i.name}`)
             }, currentShift.openedBy);
 
@@ -1623,7 +1647,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             document.getElementById('receipt-shift-id').textContent = currentShift.id;
             
             const customer = customers.find(c => c.id === saleData.customerId);
-            document.getElementById('receipt-customer').textContent = customer ? customer.name : 'Consumidor Final';
+            document.getElementById('receipt-customer').textContent = customer ? customer.name : 'Consumidor';
 
             const itemsEl = document.getElementById('receipt-items');
             itemsEl.innerHTML = '';
@@ -2000,6 +2024,8 @@ function onInventoryScanSuccess(decodedText) {
                     renderPaymentModal();
                 }
             });
+
+            document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
 
             document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
             
