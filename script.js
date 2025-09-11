@@ -863,7 +863,15 @@ function displayFilteredReports(daysToDisplay) {
 }
 
 async function renderActivityTab() {
-    contentActivities.innerHTML = `<h3 class="font-semibold text-xl text-gray-700 mb-4">Log de Atividades Recentes</h3><div id="activities-list-container">Carregando...</div>`;
+    contentActivities.innerHTML = `
+        <div class="flex flex-wrap gap-4 mb-4">
+            <h3 class="font-semibold text-xl text-gray-700">Log de Atividades Recentes</h3>
+            <input id="activity-search-input" type="text" placeholder="Buscar por texto ou usuário..." class="p-2 border rounded-md flex-1 min-w-[200px]" />
+            <button onclick="window.filterActivitiesHoje()" class="bg-blue-50 text-blue-800 px-4 py-2 rounded-lg border border-blue-200 hover:bg-blue-100">Hoje</button>
+            <button onclick="window.clearActivityFilters()" class="bg-gray-50 text-gray-800 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-100">Limpar Filtros</button>
+        </div>
+        <div id="activities-list-container">Carregando...</div>
+    `;
 
     if (!auth.currentUser) return;
     const uid = auth.currentUser.uid;
@@ -879,62 +887,105 @@ async function renderActivityTab() {
             return;
         }
 
-        container.innerHTML = logs.map(log => {
-            let detailsText = '';
-            switch (log.type) {
-                case 'VENDA_CRIADA':
-                    detailsText = `Venda #${log.details.saleId} no valor de ${formatCurrency(log.details.total)} para ${log.details.customerName}.`;
-                    break;
-                case 'PRODUTO_ADICIONADO':
-                    detailsText = `Novo produto: ${log.details.name} (SKU: ${log.details.sku}) com estoque inicial de ${log.details.stock}.`;
-                    break;
-                case 'ESTOQUE_ATUALIZADO':
-                    detailsText = `Adicionadas ${log.details.quantityAdded} unidades de "${log.details.productName}". Novo estoque: ${log.details.newStock}.`;
-                    break;
-                case 'CLIENTE_ADICIONADO':
-                    detailsText = `Novo cliente cadastrado: ${log.details.name}.`;
-                    break;
-                case 'CLIENTE_ATUALIZADO':
-                    detailsText = `Dados do cliente "${log.details.name}" foram atualizados.`;
-                    break;
-                case 'PAGAMENTO_DIVIDA':
-                    detailsText = `Recebido ${formatCurrency(log.details.amount)} de ${log.details.customerName}.`;
-                    break;
-                case 'PRODUTO_DESFEITO':
-                    detailsText = `Ação de adicionar o produto "${log.details.productName}" (SKU: ${log.details.sku}) foi desfeita.`;
-                    break;
-                case 'ESTOQUE_DESFEITO':
-                    detailsText = `Ação de adicionar ${log.details.quantityReverted} unidades ao estoque de "${log.details.productName}" foi desfeita. Novo estoque: ${log.details.newStock}.`;
-                    break;
-                case 'CLIENTE_DESFEITO':
-                    detailsText = `Ação de adicionar o cliente "${log.details.customerName}" foi desfeita.`;
-                    break;
-                case 'TURNO_FECHADO':
-                    detailsText = `Turno #${log.details.shiftId} fechado por ${log.details.closedBy}. Vendas: ${formatCurrency(log.details.totalSales)}.`;
-                    break;
-                case 'DIA_FECHADO':
-                    detailsText = `Dia de operação fechado. Vendas totais: ${formatCurrency(log.details.totalSales)}. Fundo inicial: ${formatCurrency(log.details.initialCash)}.`;
-                    break;
-                default:
-                    detailsText = JSON.stringify(log.details);
-            }
-
-            const isUndoable = ['PRODUTO_ADICIONADO', 'ESTOQUE_ATUALIZADO', 'CLIENTE_ADICIONADO'].includes(log.type) && !log.undone;
-            const logString = btoa(JSON.stringify(log)); // Encode to base64 to avoid quote issues
-
-            return `
-                        <div class="border-b p-3 hover:bg-gray-50 flex justify-between items-center">
-                            <div>
-                                <p class="font-semibold text-gray-800">${log.type.replace(/_/g, ' ')}</p>
-                                <p class="text-sm text-gray-600">${detailsText}</p>
-                                <p class="text-xs text-gray-400 mt-1">${formatDateTime(log.timestamp)} por ${log.user}</p>
-                            </div>
-                            <div>
-                                ${isUndoable ? `<button onclick="window.handleUndoActivity('${logString}')" class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-200">Desfazer</button>` : ''}
-                            </div>
+        // Agrupa por dia
+        const logsByDay = {};
+        logs.forEach(log => {
+            const dia = formatDateTime(log.timestamp).split(' ')[0];
+            if (!logsByDay[dia]) logsByDay[dia] = [];
+            logsByDay[dia].push(log);
+        });
+        let html = '';
+        Object.keys(logsByDay).reverse().forEach(dia => {
+            html += `<h4 class="mt-6 mb-2 text-lg font-bold text-gray-700">${dia}</h4>`;
+            html += logsByDay[dia].map(log => {
+                let detailsText = '';
+                switch (log.type) {
+                    case 'VENDA_CRIADA':
+                        detailsText = `Venda #${log.details.saleId} no valor de ${formatCurrency(log.details.total)} para ${log.details.customerName}.`;
+                        break;
+                    case 'PRODUTO_ADICIONADO':
+                        detailsText = `Novo produto: ${log.details.name} (SKU: ${log.details.sku}) com estoque inicial de ${log.details.stock}.`;
+                        break;
+                    case 'ESTOQUE_ATUALIZADO':
+                        detailsText = `Adicionadas ${log.details.quantityAdded} unidades de "${log.details.productName}". Novo estoque: ${log.details.newStock}.`;
+                        break;
+                    case 'CLIENTE_ADICIONADO':
+                        detailsText = `Novo cliente cadastrado: ${log.details.name}.`;
+                        break;
+                    case 'CLIENTE_ATUALIZADO':
+                        detailsText = `Dados do cliente "${log.details.name}" foram atualizados.`;
+                        break;
+                    case 'PAGAMENTO_DIVIDA':
+                        detailsText = `Recebido ${formatCurrency(log.details.amount)} de ${log.details.customerName}.`;
+                        break;
+                    case 'PRODUTO_DESFEITO':
+                        detailsText = `Ação de adicionar o produto "${log.details.productName}" (SKU: ${log.details.sku}) foi desfeita.`;
+                        break;
+                    case 'ESTOQUE_DESFEITO':
+                        detailsText = `Ação de adicionar ${log.details.quantityReverted} unidades ao estoque de "${log.details.productName}" foi desfeita. Novo estoque: ${log.details.newStock}.`;
+                        break;
+                    case 'CLIENTE_DESFEITO':
+                        detailsText = `Ação de adicionar o cliente "${log.details.customerName}" foi desfeita.`;
+                        break;
+                    case 'TURNO_FECHADO':
+                        detailsText = `Turno #${log.details.shiftId} fechado por ${log.details.closedBy}. Vendas: ${formatCurrency(log.details.totalSales)}.`;
+                        break;
+                    case 'DIA_FECHADO':
+                        detailsText = `Dia de operação fechado. Vendas totais: ${formatCurrency(log.details.totalSales)}. Fundo inicial: ${formatCurrency(log.details.initialCash)}.`;
+                        break;
+                    default:
+                        detailsText = JSON.stringify(log.details);
+                }
+                const isUndoable = ['PRODUTO_ADICIONADO', 'ESTOQUE_ATUALIZADO', 'CLIENTE_ADICIONADO'].includes(log.type) && !log.undone;
+                const logString = btoa(JSON.stringify(log));
+                return `
+                    <div class="border-b p-3 hover:bg-gray-50 flex justify-between items-center">
+                        <div>
+                            <p class="font-semibold text-gray-800">${log.type.replace(/_/g, ' ')}</p>
+                            <p class="text-sm text-gray-600">${detailsText}</p>
+                            <p class="text-xs text-gray-400 mt-1">${formatDateTime(log.timestamp)} por ${log.user}</p>
                         </div>
-                    `;
-        }).join('');
+                        <div>
+                            ${isUndoable ? `<button onclick="window.handleUndoActivity('${logString}')" class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-200">Desfazer</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        });
+        container.innerHTML = html;
+        // Filtro por texto
+        document.getElementById('activity-search-input').addEventListener('input', function (e) {
+            const val = e.target.value.toLowerCase();
+            const logs = container.querySelectorAll('div.border-b');
+            logs.forEach(log => {
+                if (log.textContent.toLowerCase().includes(val)) {
+                    log.style.display = '';
+                } else {
+                    log.style.display = 'none';
+                }
+            });
+        });
+        // Filtro rápido para hoje
+        window.filterActivitiesHoje = function () {
+            const hoje = new Date();
+            const yyyy = hoje.getFullYear();
+            const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoje.getDate()).padStart(2, '0');
+            const dataHoje = `${dd}/${mm}/${yyyy}`;
+            const logs = container.querySelectorAll('div.border-b');
+            logs.forEach(log => {
+                if (log.textContent.includes(dataHoje)) {
+                    log.style.display = '';
+                } else {
+                    log.style.display = 'none';
+                }
+            });
+        };
+        window.clearActivityFilters = function () {
+            document.getElementById('activity-search-input').value = '';
+            const logs = container.querySelectorAll('div.border-b');
+            logs.forEach(log => log.style.display = '');
+        };
 
     } catch (error) {
         console.error("Erro ao carregar log de atividades:", error);
