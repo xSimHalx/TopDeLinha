@@ -288,6 +288,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.6.0',
+    date: '11/09/2025',
+    notes: [
+        'Reorganizados os botões na tela de PDV para melhor usabilidade.',
+        'Adicionado botão "Escanear" com a câmera no PDV.'
+    ]
+}, {
     version: '1.5.9',
     date: '11/09/2025',
     notes: [
@@ -474,7 +481,6 @@ function renderDashboardTab() {
             contentPdv.innerHTML = `
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold text-gray-700">Frente de Caixa (PDV)</h3>
-                    <button id="cancel-sale-button" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">Cancelar Venda</button>
                 </div>
                  <div id="pdv-idle-screen" class="text-center py-20 hidden">
                     <h2 class="mt-4 text-2xl font-bold text-gray-700">Caixa Livre</h2>
@@ -484,11 +490,17 @@ function renderDashboardTab() {
                     <div id="pdv-left-column" class="relative">
                         <div class="mb-6">
                             <label for="barcode-input-field" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
-                            <input type="text" id="barcode-input-field" placeholder="Aguardando leitura do código..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                            <div class="flex items-center gap-2 mt-1">
+                                <input type="text" id="barcode-input-field" placeholder="Use o leitor ou a câmera..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                                <button type="button" id="pdv-scan-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
+                            </div>
                         </div>
                         <div class="mb-6">
                             <label for="product-search-input" class="block text-sm font-medium text-gray-700">Pesquisar Produto por Nome</label>
-                            <input type="text" id="product-search-input" onkeyup="handlePdvProductSearch(event)" placeholder="Digite o nome do produto..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                            <div class="flex items-center gap-2 mt-1">
+                                <input type="text" id="product-search-input" onkeyup="handlePdvProductSearch(event)" placeholder="Digite o nome do produto..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                                <button id="diversos-button" class="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-800 whitespace-nowrap">Diversos</button>
+                            </div>
                             <div id="pdv-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
                         </div>
                         <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-4">Ou adicione manualmente</h3>
@@ -500,7 +512,7 @@ function renderDashboardTab() {
                         <div class="mt-6 pt-6 border-t">
                             <p class="text-2xl font-bold text-gray-800 text-right">Total: <span id="cart-total" class="text-indigo-600">R$ 0,00</span></p>
                             <button id="checkout-button" class="mt-4 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-gray-400" disabled>Finalizar Venda</button>
-                            <button id="diversos-button" class="mt-2 w-full bg-gray-700 text-white font-bold py-2 rounded-lg hover:bg-gray-800">Diversos</button>
+                            <button id="cancel-sale-button" class="mt-2 w-full bg-red-500 text-white font-bold py-2 rounded-lg hover:bg-red-600">Cancelar Venda</button>
                         </div>
                     </div>
                 </div>
@@ -2004,7 +2016,7 @@ function onInventoryScanSuccess(decodedText) {
                 if (e.target.id === 'checkout-button') handleCheckout(e);
                 if (e.target.id === 'cancel-sale-button') resetPdv();
                 if (e.target.id === 'diversos-button') openDiversosModal();
-                if (e.target.id === 'open-scanner-button') {
+                if (e.target.id === 'pdv-scan-button') {
                     startScanner(onPdvScanSuccess);
                 }
             });
