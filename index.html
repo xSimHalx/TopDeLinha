@@ -278,7 +278,7 @@
                     <form id="add-payment-form" class="flex items-end gap-2">
                         <div class="flex-grow">
                              <label for="payment-amount" class="block text-sm font-medium">Valor</label>
-                            <input type="number" id="payment-amount" step="0.01" min="0.01" required class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm">
+                            <input type="tel" id="payment-amount" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm" autocomplete="off">
                         </div>
                         <button type="submit" class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 h-10">Adicionar</button>
                     </form>
@@ -323,7 +323,7 @@
                 </div>
                  <div>
                     <label for="edit-customer-debt" class="block text-sm font-medium text-gray-700">Dívida Atual (R$)</label>
-                    <input type="number" id="edit-customer-debt" step="0.01" min="0" required class="mt-1 block w-full p-2 border rounded-md">
+                    <input type="tel" id="edit-customer-debt" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
                 </div>
             </form>
             <div class="bg-gray-100 p-4 flex justify-end">
@@ -346,7 +346,7 @@
                 <div>
                     <label for="debt-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
                     <div class="flex items-center gap-2 mt-1">
-                        <input type="number" id="debt-payment-amount" step="0.01" min="0.01" required class="block w-full p-2 border rounded-md">
+                        <input type="tel" id="debt-payment-amount" placeholder="R$ 0,00" required class="block w-full p-2 border rounded-md" autocomplete="off">
                         <button type="button" id="pay-full-debt-button" class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-2 rounded-md hover:bg-blue-200 whitespace-nowrap">Pagar Total</button>
                     </div>
                 </div>
