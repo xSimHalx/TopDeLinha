@@ -1728,8 +1728,13 @@ async function confirmSale() {
         const customerRef = doc(db, "customers", customerId);
         const customer = customers.find(c => c.id === customerId);
         const newDebt = (customer.debt || 0) + saleInProgress.total;
-        await updateDoc(customerRef, { debt: newDebt });
-        saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
+        await updateDoc(customerRef, {
+            debt: newDebt
+        });
+        saleInProgress.payments = [{
+            method: 'Fiado',
+            amount: saleInProgress.total
+        }];
     }
 
     // Find the current active shift within currentDay.shifts
@@ -1748,11 +1753,18 @@ async function confirmSale() {
     const lowStockProducts = [];
     // Update stock in Firestore
     for (const cartItem of saleInProgress.items) {
-        const productRef = doc(db, "products", cartItem.id);
-        const newStock = cartItem.stock - cartItem.quantity;
-        await updateDoc(productRef, { stock: newStock });
-        if (newStock <= cartItem.minStock) {
-            lowStockProducts.push(cartItem.name);
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Verificamos se o item possui um 'id'. Itens "Diversos" não possuem,
+        // então o código dentro deste 'if' será ignorado para eles.
+        if (cartItem.id) {
+            const productRef = doc(db, "products", cartItem.id);
+            const newStock = cartItem.stock - cartItem.quantity;
+            await updateDoc(productRef, {
+                stock: newStock
+            });
+            if (newStock <= cartItem.minStock) {
+                lowStockProducts.push(cartItem.name);
+            }
         }
     }
 
