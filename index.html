@@ -115,9 +115,9 @@
                 <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button">Gestão de Caixa</button>
                 <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button" disabled>Frente de Caixa (PDV)</button>
                 <button onclick="changeTab('inventory')" id="tab-inventory" class="tab-button">Estoque</button>
-                <button onclick="changeTab('customers')" id="tab-customers" class="tab-button">Clientes & Fiado</button>
+                <button onclick="changeTab('customers')" id="tab-customers" class="tab-button">Clientes</button>
                 <button onclick="changeTab('reports')" id="tab-reports" class="tab-button">Relatórios</button>
-                <button onclick="changeTab('activities')" id="tab-activities" class="tab-button">Atividades</button>
+                <button onclick="changeTab('activities')" id="tab-activities" class="tab-button">Atividades/Historico</button>
                 <button onclick="changeTab('settings')" id="tab-settings" class="tab-button">Configurações</button>
             </nav>
         </div>
@@ -180,7 +180,9 @@
                     </div>
                 </div>
                 </div>
-                <div id="content-pdv" class="tab-content hidden"></div>
+                                <div id="content-pdv" class="tab-content hidden">
+                    <!-- O conteúdo do PDV será renderizado dinamicamente aqui -->
+                </div>
                 <div id="content-inventory" class="tab-content hidden"></div>
                 <div id="content-customers" class="tab-content hidden"></div>
                 <div id="content-reports" class="tab-content hidden"></div>

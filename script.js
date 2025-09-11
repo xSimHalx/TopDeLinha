@@ -287,6 +287,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.3',
+    date: '11/09/2025',
+    notes: [
+        'Adicionado botão de cancelar venda no PDV'
+    ]
+}, {
     version: '1.5.2',
     date: '11/09/2025',
     notes: [
@@ -427,6 +433,10 @@ function renderDashboardTab() {
 
         function renderPdvTab() {
             contentPdv.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-700">Frente de Caixa (PDV)</h3>
+                    <button id="cancel-sale-button" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">Cancelar Venda</button>
+                </div>
                  <div id="pdv-idle-screen" class="text-center py-20 hidden">
                     <h2 class="mt-4 text-2xl font-bold text-gray-700">Caixa Livre</h2>
                     <button id="start-sale-button" class="mt-6 bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg">Iniciar Nova Venda</button>
@@ -1339,7 +1349,8 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 if (product) {
                     addToCart(product.sku);
                 } else {
-                    showModal('Produto não encontrado', `Nenhum produto corresponde ao código '${scannedCode}'.`);
+                    // Open the new product modal for on-the-fly addition
+                    openAddProductPdvModal(scannedCode);
                 }
             }
         }
@@ -1897,6 +1908,7 @@ function onInventoryScanSuccess(decodedText) {
             contentPdv.addEventListener('click', function(e) {
                 if (e.target.id === 'start-sale-button') startNewSale(e);
                 if (e.target.id === 'checkout-button') handleCheckout(e);
+                if (e.target.id === 'cancel-sale-button') resetPdv();
                 if (e.target.id === 'open-scanner-button') {
                     startScanner(onPdvScanSuccess);
                 }
