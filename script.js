@@ -288,6 +288,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.9',
+    date: '11/09/2025',
+    notes: [
+        'Adicionado botão [X] para remover itens diretamente do carrinho.',
+        'Melhorada a visualização dos itens no carrinho com mais detalhes.'
+    ]
+}, {
     version: '1.5.8',
     date: '11/09/2025',
     notes: [
@@ -1430,12 +1437,16 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 cartItemsEl.innerHTML = '';
                 cart.forEach(item => {
                     cartItemsEl.innerHTML += `
-                        <div class="flex items-center mb-3">
-                            <div class="flex-grow"><p class="font-semibold">${item.name}</p></div>
+                        <div class="flex items-center mb-3 p-2 bg-white rounded-lg shadow-sm">
+                            <div class="flex-grow">
+                                <p class="font-semibold">${item.name}</p>
+                                <p class="text-sm text-gray-500">${formatCurrency(item.price)} x ${item.quantity} = ${formatCurrency(item.price * item.quantity)}</p>
+                            </div>
                             <div class="flex items-center">
-                                <button onclick="updateCartQuantity('${item.sku}', -1)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">-</button>
-                                <span class="w-10 text-center font-semibold">${item.quantity}</span>
-                                <button onclick="updateCartQuantity('${item.sku}', 1)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">+</button>
+                                <button onclick="updateCartQuantity('${item.sku}', -1)" class="w-8 h-8 bg-gray-200 rounded-full font-bold text-lg">-</button>
+                                <span class="w-12 text-center font-semibold text-lg">${item.quantity}</span>
+                                <button onclick="updateCartQuantity('${item.sku}', 1)" class="w-8 h-8 bg-gray-200 rounded-full font-bold text-lg">+</button>
+                                <button onclick="removeFromCart('${item.sku}')" class="ml-4 w-8 h-8 bg-red-100 text-red-600 rounded-full font-bold text-lg hover:bg-red-200">X</button>
                             </div>
                         </div>`;
                 });
@@ -1445,7 +1456,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             cartTotalEl.textContent = formatCurrency(total);
         }
 
-        export function updateCartQuantity(sku, change) {
+        window.updateCartQuantity = function(sku, change) {
             const cartItem = cart.find(item => item.sku === sku);
             if (!cartItem) return;
             if (change > 0) {
@@ -1461,6 +1472,15 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 if (itemIndex > -1) {
                     cart.splice(itemIndex, 1);
                 }
+            }
+            if (cart.length === 0) resetPdv();
+            renderCart();
+        }
+
+        window.removeFromCart = function(sku) {
+            const itemIndex = cart.findIndex(item => item.sku === sku);
+            if (itemIndex > -1) {
+                cart.splice(itemIndex, 1);
             }
             if (cart.length === 0) resetPdv();
             renderCart();
@@ -2039,5 +2059,5 @@ function onInventoryScanSuccess(decodedText) {
                 }
             });
 
-            window.updateCartQuantity = updateCartQuantity;
+            
         });
