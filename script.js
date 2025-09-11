@@ -65,25 +65,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
-        const parseCurrency = (value) => {
-            if (typeof value !== 'string') {
-                return value;
-            }
-            const numberString = value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
-            return parseFloat(numberString);
-        }
-
-        function handleCurrencyInput(event) {
-            const input = event.target;
-            let value = input.value.replace(/\D/g, '');
-            if (value) {
-                const numericValue = parseFloat(value) / 100;
-                input.value = formatCurrency(numericValue);
-            } else {
-                input.value = '';
-            }
-        }
-
         window.showModal = function(title, message, warningMessage = '') {
             const modal = document.getElementById('success-modal');
             modal.querySelector('#modal-title').textContent = title;
@@ -307,32 +288,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
-    version: '1.6.4',
-    date: '11/09/2025',
-    notes: [
-        'Melhoria visual dos cards de relatório para maior clareza e apelo estético.',
-        'Campos de entrada de valores monetários agora exibem a vírgula decimal automaticamente.'
-    ]
-}, {
-    version: '1.6.3',
-    date: '11/09/2025',
-    notes: [
-        'Melhoria visual dos cards de relatório para maior clareza e apelo estético.'
-    ]
-}, {
-    version: '1.6.2',
-    date: '11/09/2025',
-    notes: [
-        'Corrigido bug na venda a fiado com itens "Diversos" que impedia a finalização da venda.'
-    ]
-}, {
-    version: '1.6.1',
-    date: '11/09/2025',
-    notes: [
-        'Adicionada máscara de moeda no campo de troco inicial.',
-        'Cards do painel agora são clicáveis e redirecionam para as abas correspondentes.'
-    ]
-}, {
     version: '1.6.0',
     date: '11/09/2025',
     notes: [
@@ -468,17 +423,17 @@ function renderDashboardTab() {
 
     contentDashboard.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div onclick="changeTab('reports')" class="bg-green-50 p-6 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors">
+            <div class="bg-green-50 p-6 rounded-lg border border-green-200">
                 <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
                 <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
                 <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
             </div>
-            <div onclick="changeTab('customers')" class="bg-orange-50 p-6 rounded-lg border border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors">
+            <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
                 <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
                 <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
                 <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
             </div>
-            <div onclick="changeTab('inventory')" class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2 cursor-pointer hover:bg-red-100 transition-colors">
+            <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
                 <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
                 ${lowStockItems.length > 0 ? `
                     <ul class="mt-2 space-y-1 text-sm max-h-[10vh] overflow-y-auto">
@@ -618,7 +573,7 @@ function renderDashboardTab() {
                             <input type="text" id="new-sku" placeholder="Código Interno (SKU)" required class="w-full p-2 border rounded">
                             <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
                             <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-price" placeholder="R$ 0,00" required class="w-full p-2 border rounded" autocomplete="off">
+                            <input type="number" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
                             <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
                             <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
@@ -634,7 +589,7 @@ function renderDashboardTab() {
                         </div>
                     </div>
                 </div>
-            `;
+            `
             renderInventoryManagement();
         }
 
@@ -665,7 +620,10 @@ function renderDashboardTab() {
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -686,7 +644,7 @@ function renderDashboardTab() {
                         <form id="add-customer-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
                             <input type="text" id="new-customer-name" placeholder="Nome Completo" required class="w-full p-2 border rounded">
                             <input type="text" id="new-customer-phone" placeholder="Telefone (opcional)" class="w-full p-2 border rounded">
-                            <input type="tel" id="new-customer-debt" placeholder="R$ 0,00" class="w-full p-2 border rounded" autocomplete="off">
+                            <input type="number" id="new-customer-debt" placeholder="Dívida Inicial (R$)" step="0.01" min="0" class="w-full p-2 border rounded">
                             <button type="submit" class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar Cliente</button>
                         </form>
                     </div>
@@ -801,45 +759,42 @@ function renderDashboardTab() {
                 )).join('') : '<span>Nenhum recebimento no dia.</span>';
 
                 reportsHTML += (
-    `<details class="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-        <summary class="cursor-pointer flex justify-between items-center py-2">
-            <div class="flex items-center space-x-3">
-                <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                <div>
-                    <p class="font-bold text-xl text-gray-800">Relatório do Dia: ${day.date.split(',')[0]}</p>
-                    <p class="text-sm text-gray-500">ID do Dia: #${day.id}</p>
-                </div>
-            </div>
-            <div class="text-right">
-                <p class="text-sm text-gray-600">Total de Vendas do Dia</p>
-                <p class="font-bold text-2xl text-green-600">${formatCurrency(totalSalesValue)}</p>
-            </div>
-        </summary>
-        <div class="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <h5 class="font-semibold text-gray-700 mb-2">Resumo Financeiro do Dia</h5>
-                <div class="text-sm space-y-1">
-                    <div class="flex justify-between"><span>Fundo de Troco Inicial:</span> <span class="font-medium">${formatCurrency(day.initialCash)}</span></div>
-                    ${Object.entries(paymentsSummary).map(([method, amount]) => `<div class="flex justify-between"><span>Total em ${method}:</span> <span class="font-medium">${formatCurrency(amount)}</span></div>`).join('')}
-                    <div class="flex justify-between font-bold mt-2 pt-2 border-t border-gray-200">
-                        <span>Esperado em Dinheiro (Final):</span>
-                        <span class="text-indigo-600">${formatCurrency(expectedCashInDrawer)}</span>
+            `<details class="bg-gray-50 p-4 rounded-lg border">
+                <summary class="cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-bold text-lg">Relatório do Dia: ${day.date.split(',')[0]}</p>
+                            <p class="text-sm text-gray-600">ID do Dia: #${day.id}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm">Total de Vendas do Dia</p>
+                            <p class="font-bold text-xl">${formatCurrency(totalSalesValue)}</p>
+                        </div>
+                    </div>
+                </summary>
+                <div class="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="font-semibold">Resumo Financeiro do Dia</p>
+                        <div class="text-sm mt-2 space-y-1">
+                            <div class="flex justify-between"><span>Fundo de Troco Inicial:</span> <span>${formatCurrency(day.initialCash)}</span></div>
+                            ${Object.entries(paymentsSummary).map(([method, amount]) => `<div class="flex justify-between"><span>Total em ${method}:</span> <span>${formatCurrency(amount)}</span></div>`).join('')}
+                            <div class="flex justify-between font-bold mt-2 pt-2 border-t">
+                                <span>Esperado em Dinheiro (Final):</span>
+                                <span>${formatCurrency(expectedCashInDrawer)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="font-semibold">Recebimentos de Dívidas</p>
+                        <div class="text-sm mt-2 space-y-1">${debtPaymentsHTML}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="font-semibold mt-4">Detalhes dos Turnos (${day.shifts.length})</p>
+                        ${shiftsDetailsHTML}
                     </div>
                 </div>
-            </div>
-            <div>
-                <h5 class="font-semibold text-gray-700 mb-2">Recebimentos de Dívidas</h5>
-                <div class="text-sm space-y-1">${debtPaymentsHTML}</div>
-            </div>
-            <div class="md:col-span-2">
-                <h5 class="font-semibold text-gray-700 mt-4 mb-2">Detalhes dos Turnos (${day.shifts.length})</h5>
-                <div class="space-y-2">
-                    ${shiftsDetailsHTML}
-                </div>
-            </div>
-        </div>
-    </details>
-`
+            </details>
+        `
                 );
             });
             container.innerHTML = reportsHTML;
@@ -1121,7 +1076,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 return;
             }
 
-            const initialCash = parseCurrency(document.getElementById('initial-cash').value);
+            const initialCash = parseFloat(document.getElementById('initial-cash').value);
             const openedBy = document.getElementById('opening-user').value;
             if (isNaN(initialCash) || initialCash < 0) {
                 showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
@@ -1241,7 +1196,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             const name = document.getElementById('new-customer-name').value.trim();
             const phone = document.getElementById('new-customer-phone').value.trim();
-            const debt = parseCurrency(document.getElementById('new-customer-debt').value) || 0;
+            const debt = parseFloat(document.getElementById('new-customer-debt').value) || 0;
             if (!name) {
                 showModal('Erro', 'O nome do cliente é obrigatório.');
                 return;
@@ -1329,7 +1284,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             const customerId = document.getElementById('debt-customer-id').value;
             const customerRef = doc(db, "customers", customerId);
 
-            const amount = parseCurrency(document.getElementById('debt-payment-amount').value);
+            const amount = parseFloat(document.getElementById('debt-payment-amount').value);
             const method = document.getElementById('debt-payment-method').value;
 
             const customer = customers.find(c => c.id === customerId);
@@ -1388,7 +1343,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             const name = document.getElementById('edit-customer-name').value.trim();
             const phone = document.getElementById('edit-customer-phone').value.trim();
-            const debt = parseCurrency(document.getElementById('edit-customer-debt').value) || 0;
+            const debt = parseFloat(document.getElementById('edit-customer-debt').value) || 0;
 
             try {
                 await updateDoc(customerRef, { name, phone, debt });
@@ -1449,6 +1404,9 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 const product = products.find(p => p.barcode === scannedCode);
                 if (product) {
                     addToCart(product.sku);
+                } else {
+                    // Open the new product modal for on-the-fly addition
+                    openAddProductPdvModal(scannedCode);
                 }
             }
         }
@@ -1595,7 +1553,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
         function handleAddPayment(event) {
             event.preventDefault();
-            const amount = parseCurrency(document.getElementById('payment-amount').value);
+            const amount = parseFloat(document.getElementById('payment-amount').value);
             if (isNaN(amount) || amount <= 0) {
                 showModal('Erro', 'Valor de pagamento inválido.');
                 return;
@@ -1635,7 +1593,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             if (e.target.classList.contains('diversos-item-btn')) {
                 const itemName = e.target.dataset.item;
                 const priceStr = prompt(`Digite o valor para "${itemName}":`);
-                const price = parseCurrency(priceStr); // Use parseCurrency here
+                const price = parseFloat(priceStr);
 
                 if (!isNaN(price) && price > 0) {
                     addDiversosToCart(itemName, price);
@@ -1677,10 +1635,6 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             const lowStockProducts = [];
             // Update stock in Firestore
             for(const cartItem of saleInProgress.items) {
-                // Itens "Diversos" não têm controle de estoque no banco de dados
-                if (cartItem.sku && cartItem.sku.startsWith('DIVERSOS-')) {
-                    continue;
-                }
                 const productRef = doc(db, "products", cartItem.id);
                 const newStock = cartItem.stock - cartItem.quantity;
                 await updateDoc(productRef, { stock: newStock });
@@ -1869,7 +1823,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 }
             }
             const name = document.getElementById('new-name').value.trim();
-            const price = parseCurrency(document.getElementById('new-price').value);
+            const price = parseFloat(document.getElementById('new-price').value);
             const stock = parseInt(document.getElementById('new-stock').value);
             const minStock = parseInt(document.getElementById('new-min-stock').value);
 
@@ -1934,15 +1888,26 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             const product = products.find(p => p.barcode === barcode.trim());
             if (product) {
-                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
+                const quantityStr = prompt(`Produto encontrado: ${product.name}
+Estoque atual: ${product.stock}
+
+Qual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
                     await updateProductStock(product.id, quantity);
                 } else if(quantityStr !== null) {
                     showModal('Erro', 'Quantidade inválida.');
                 }
+            } else {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.
+Deseja cadastrá-lo agora?`)) {
+                    changeTab('inventory');
+                    document.getElementById('new-barcode').value = barcode.trim();
+                    document.getElementById('new-sku').focus();
+                }
             }
         }
+        
         
 
         // --- BARCODE SCANNER LOGIC ---
@@ -2034,8 +1999,6 @@ function onInventoryScanSuccess(decodedText) {
             addPaymentForm.addEventListener('submit', handleAddPayment);
             confirmSaleButton.addEventListener('click', confirmSale);
             
-            document.getElementById('initial-cash').addEventListener('input', handleCurrencyInput);
-
             document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
             document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
@@ -2076,20 +2039,10 @@ function onInventoryScanSuccess(decodedText) {
                     e.target.value = '';
                 }
             });
-            // Add input event listener for new-price
-            contentInventory.addEventListener('input', function(e) {
-                if (e.target.id === 'new-price') handleCurrencyInput(e);
-            });
-
 
             contentCustomers.addEventListener('submit', function(e) {
                 if (e.target.id === 'add-customer-form') handleAddCustomer(e);
             });
-            // Add input event listener for new-customer-debt
-            contentCustomers.addEventListener('input', function(e) {
-                if (e.target.id === 'new-customer-debt') handleCurrencyInput(e);
-            });
-
 
             // NEW: Settings event listeners
             contentSettings.addEventListener('submit', function(e) {
@@ -2103,11 +2056,6 @@ function onInventoryScanSuccess(decodedText) {
                     renderPaymentModal();
                 }
             });
-            // Add input event listener for payment-amount
-            paymentModal.addEventListener('input', function(e) {
-                if (e.target.id === 'payment-amount') handleCurrencyInput(e);
-            });
-
 
             document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
 
@@ -2122,13 +2070,6 @@ function onInventoryScanSuccess(decodedText) {
                     }
                 }
             });
-            // Add input event listener for debt-payment-amount
-            debtPaymentModal.addEventListener('input', function(e) {
-                if (e.target.id === 'debt-payment-amount') handleCurrencyInput(e);
-            });
 
-            // Add input event listener for edit-customer-debt
-            editCustomerModal.addEventListener('input', function(e) {
-                if (e.target.id === 'edit-customer-debt') handleCurrencyInput(e);
-            });
+            
         });
