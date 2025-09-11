@@ -65,6 +65,25 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
+        const parseCurrency = (value) => {
+            if (typeof value !== 'string') {
+                return value;
+            }
+            const numberString = value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+            return parseFloat(numberString);
+        }
+
+        function handleCurrencyInput(event) {
+            const input = event.target;
+            let value = input.value.replace(/\D/g, '');
+            if (value) {
+                const numericValue = parseFloat(value) / 100;
+                input.value = formatCurrency(numericValue);
+            } else {
+                input.value = '';
+            }
+        }
+
         window.showModal = function(title, message, warningMessage = '') {
             const modal = document.getElementById('success-modal');
             modal.querySelector('#modal-title').textContent = title;
@@ -288,6 +307,19 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.6.2',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido bug na venda a fiado com itens "Diversos" que impedia a finalização da venda.'
+    ]
+}, {
+    version: '1.6.1',
+    date: '11/09/2025',
+    notes: [
+        'Adicionada máscara de moeda no campo de troco inicial.',
+        'Cards do painel agora são clicáveis e redirecionam para as abas correspondentes.'
+    ]
+}, {
     version: '1.6.0',
     date: '11/09/2025',
     notes: [
@@ -423,17 +455,17 @@ function renderDashboardTab() {
 
     contentDashboard.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="bg-green-50 p-6 rounded-lg border border-green-200">
+            <div onclick="changeTab('reports')" class="bg-green-50 p-6 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors">
                 <h4 class="text-sm font-semibold text-green-800">Vendas do Dia</h4>
                 <p class="text-3xl font-bold text-green-600 mt-2">${formatCurrency(totalSalesToday)}</p>
                 <p class="text-xs text-green-700">${salesCountToday} vendas realizadas</p>
             </div>
-            <div class="bg-orange-50 p-6 rounded-lg border border-orange-200">
+            <div onclick="changeTab('customers')" class="bg-orange-50 p-6 rounded-lg border border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors">
                 <h4 class="text-sm font-semibold text-orange-800">Total a Receber (Fiado)</h4>
                 <p class="text-3xl font-bold text-orange-600 mt-2">${formatCurrency(totalDebt)}</p>
                 <p class="text-xs text-orange-700">${customers.filter(c => c.debt > 0).length} clientes com dívidas</p>
             </div>
-            <div class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2">
+            <div onclick="changeTab('inventory')" class="bg-red-50 p-6 rounded-lg border border-red-200 col-span-1 md:col-span-2 cursor-pointer hover:bg-red-100 transition-colors">
                 <h4 class="text-sm font-semibold text-red-800">Itens com Estoque Baixo</h4>
                 ${lowStockItems.length > 0 ? `
                     <ul class="mt-2 space-y-1 text-sm max-h-[10vh] overflow-y-auto">
@@ -620,10 +652,7 @@ function renderDashboardTab() {
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const quantityStr = prompt(`Produto selecionado: ${product.name}
-Estoque atual: ${product.stock}
-
-Qual a quantidade a adicionar?`);
+            const quantityStr = prompt(`Produto selecionado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
             const quantity = parseInt(quantityStr);
 
             if (!isNaN(quantity) && quantity > 0) {
@@ -1076,7 +1105,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 return;
             }
 
-            const initialCash = parseFloat(document.getElementById('initial-cash').value);
+            const initialCash = parseCurrency(document.getElementById('initial-cash').value);
             const openedBy = document.getElementById('opening-user').value;
             if (isNaN(initialCash) || initialCash < 0) {
                 showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
@@ -1635,6 +1664,10 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             const lowStockProducts = [];
             // Update stock in Firestore
             for(const cartItem of saleInProgress.items) {
+                // Itens "Diversos" não têm controle de estoque no banco de dados
+                if (cartItem.sku && cartItem.sku.startsWith('DIVERSOS-')) {
+                    continue;
+                }
                 const productRef = doc(db, "products", cartItem.id);
                 const newStock = cartItem.stock - cartItem.quantity;
                 await updateDoc(productRef, { stock: newStock });
@@ -1888,10 +1921,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             const product = products.find(p => p.barcode === barcode.trim());
             if (product) {
-                const quantityStr = prompt(`Produto encontrado: ${product.name}
-Estoque atual: ${product.stock}
-
-Qual a quantidade a adicionar?`);
+                const quantityStr = prompt(`Produto encontrado: ${product.name}\nEstoque atual: ${product.stock}\n\nQual a quantidade a adicionar?`);
                 const quantity = parseInt(quantityStr);
                 if (!isNaN(quantity) && quantity > 0) {
                     await updateProductStock(product.id, quantity);
@@ -1899,15 +1929,13 @@ Qual a quantidade a adicionar?`);
                     showModal('Erro', 'Quantidade inválida.');
                 }
             } else {
-                if (confirm(`Produto com código de barras "${barcode}" não encontrado.
-Deseja cadastrá-lo agora?`)) {
+                if (confirm(`Produto com código de barras "${barcode}" não encontrado.\nDeseja cadastrá-lo agora?`)) {
                     changeTab('inventory');
                     document.getElementById('new-barcode').value = barcode.trim();
                     document.getElementById('new-sku').focus();
                 }
             }
         }
-        
         
 
         // --- BARCODE SCANNER LOGIC ---
@@ -1999,6 +2027,8 @@ function onInventoryScanSuccess(decodedText) {
             addPaymentForm.addEventListener('submit', handleAddPayment);
             confirmSaleButton.addEventListener('click', confirmSale);
             
+            document.getElementById('initial-cash').addEventListener('input', handleCurrencyInput);
+
             document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
             document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
             document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
