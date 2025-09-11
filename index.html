@@ -404,6 +404,26 @@
         </div>
     </div>
 
+    <!-- Modal Diversos -->
+    <div id="diversos-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Itens Diversos</h3>
+                <button onclick="closeDiversosModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div id="diversos-options" class="p-6 grid grid-cols-2 gap-4">
+                <button data-item="Pao" class="diversos-item-btn p-4 rounded-md border-2">Pão</button>
+                <button data-item="Balas" class="diversos-item-btn p-4 rounded-md border-2">Balas</button>
+                <button data-item="Salgados" class="diversos-item-btn p-4 rounded-md border-2">Salgados</button>
+                <button data-item="Bebidas" class="diversos-item-btn p-4 rounded-md border-2">Bebidas</button>
+                <button data-item="Outros" class="diversos-item-btn p-4 rounded-md border-2">Outros</button>
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end">
+                <button onclick="closeDiversosModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Barcode Scanner Modal -->
     <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">

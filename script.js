@@ -59,6 +59,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         const editCustomerModal = document.getElementById('edit-customer-modal');
         const debtPaymentModal = document.getElementById('debt-payment-modal');
         const receiptModal = document.getElementById('receipt-modal');
+        const diversosModal = document.getElementById('diversos-modal');
 
         // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
         export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -287,10 +288,22 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
         // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.5.5',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido o botão "Diversos" que não estava funcionando corretamente.'
+    ]
+}, {
+    version: '1.5.4',
+    date: '11/09/2025',
+    notes: [
+        'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.'
+    ]
+}, {
     version: '1.5.3',
     date: '11/09/2025',
     notes: [
-        'Adicionado botão de cancelar venda no PDV'
+        'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.'
     ]
 }, {
     version: '1.5.2',
@@ -461,6 +474,7 @@ function renderDashboardTab() {
                         <div class="mt-6 pt-6 border-t">
                             <p class="text-2xl font-bold text-gray-800 text-right">Total: <span id="cart-total" class="text-indigo-600">R$ 0,00</span></p>
                             <button id="checkout-button" class="mt-4 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-gray-400" disabled>Finalizar Venda</button>
+                            <button id="diversos-button" class="mt-2 w-full bg-gray-700 text-white font-bold py-2 rounded-lg hover:bg-gray-800">Diversos</button>
                         </div>
                     </div>
                 </div>
@@ -1497,6 +1511,42 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
             setTimeout(() => paymentModal.classList.add('hidden'), 200);
         }
 
+        window.openDiversosModal = function() {
+            diversosModal.classList.remove('hidden');
+        }
+
+        window.closeDiversosModal = function() {
+            diversosModal.classList.add('hidden');
+        }
+
+        function addDiversosToCart(itemName, itemPrice) {
+            const cartItem = {
+                sku: `DIVERSOS-${itemName.toUpperCase()}-${Date.now()}`,
+                name: `Diversos - ${itemName}`,
+                price: itemPrice,
+                quantity: 1,
+                stock: Infinity,
+                minStock: 0
+            };
+            cart.push(cartItem);
+            renderCart();
+            closeDiversosModal();
+        }
+
+        function handleDiversosItemClick(e) {
+            if (e.target.classList.contains('diversos-item-btn')) {
+                const itemName = e.target.dataset.item;
+                const priceStr = prompt(`Digite o valor para "${itemName}":`);
+                const price = parseFloat(priceStr);
+
+                if (!isNaN(price) && price > 0) {
+                    addDiversosToCart(itemName, price);
+                } else if (priceStr !== null) {
+                    showModal('Valor Inválido', 'Por favor, insira um preço válido.');
+                }
+            }
+        }
+
         async function confirmSale() {
             const customerId = document.getElementById('payment-modal-customer-select').value;
             saleInProgress.customerId = customerId;
@@ -1909,6 +1959,7 @@ function onInventoryScanSuccess(decodedText) {
                 if (e.target.id === 'start-sale-button') startNewSale(e);
                 if (e.target.id === 'checkout-button') handleCheckout(e);
                 if (e.target.id === 'cancel-sale-button') resetPdv();
+                if (e.target.id === 'diversos-button') openDiversosModal();
                 if (e.target.id === 'open-scanner-button') {
                     startScanner(onPdvScanSuccess);
                 }
@@ -1949,6 +2000,8 @@ function onInventoryScanSuccess(decodedText) {
                     renderPaymentModal();
                 }
             });
+
+            document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
             
             debtPaymentModal.addEventListener('click', (e) => {
                 if (e.target.id === 'pay-full-debt-button') {
