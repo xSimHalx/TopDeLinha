@@ -299,6 +299,12 @@ async function logActivity(type, details, user = 'Sistema') {
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.6.1',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
+    ]
+}, {
     version: '1.6.0',
     date: '11/09/2025',
     notes: [
@@ -1626,8 +1632,8 @@ function handleCheckout() {
 }
 
 function renderPaymentModal() {
-    const total = saleInProgress.total;
-    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+    const total = parseFloat(saleInProgress.total.toFixed(2));
+    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
     const change = totalPaid > total ? totalPaid - total : 0;
     const customerId = document.getElementById('payment-modal-customer-select')?.value || saleInProgress.customerId;
 
