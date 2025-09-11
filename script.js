@@ -1944,15 +1944,22 @@ async function handleAddProduct(event) {
     const barcode = document.getElementById('new-barcode').value.trim();
     // NEW: Barcode validation
     if (barcode !== '') {
-        if (!/^\d+$/.test(barcode)) {
-            showModal('Erro de Código de Barras', 'O código de barras deve conter apenas números.');
-            return;
-        }
-        if (barcode.length !== 13) {
-            showModal('Erro de Código de Barras', 'O código de barras deve ter 13 dígitos (padrão EAN-13).');
-            return;
-        }
+    // só aceita números
+    if (!/^\d+$/.test(barcode)) {
+        showModal('Erro de Código de Barras', 'O código de barras deve conter apenas números.');
+        return;
     }
+
+    // tamanhos aceitos: EAN-8, UPC-12, EAN-13
+    const tamanhosAceitos = [8, 12, 13];
+
+    if (!tamanhosAceitos.includes(barcode.length)) {
+        showModal('Erro de Código de Barras', 
+            'O código de barras deve ter 8, 12 ou 13 dígitos (padrão EAN-8, UPC ou EAN-13).');
+        return;
+    }
+}
+
     const name = document.getElementById('new-name').value.trim();
     const price = parseFloat(document.getElementById('new-price').value);
     const stock = parseInt(document.getElementById('new-stock').value);
