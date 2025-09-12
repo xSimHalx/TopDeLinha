@@ -1692,7 +1692,7 @@ function handleAddPayment(event) {
         showModal('Erro', 'Valor de pagamento inválido.');
         return;
     }
-    saleInProgress.payments.push({ method: selectedPaymentMethod, amount });
+    saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
     renderPaymentModal();
 }
 
@@ -1740,79 +1740,99 @@ function handleDiversosItemClick(e) {
 }
 
 async function confirmSale() {
-    const customerId = document.getElementById('payment-modal-customer-select').value;
-    saleInProgress.customerId = customerId;
+    const confirmButton = document.getElementById('confirm-sale-button');
+    confirmButton.disabled = true;
+    confirmButton.textContent = 'Processando...';
 
-    if (selectedPaymentMethod === 'Fiado') {
-        if (customerId === "1") {
-            showModal('Ação Inválida', 'Selecione um cliente cadastrado para vendas a fiado.');
+    try {
+        const saleTotal = saleInProgress.total;
+        let payments = JSON.parse(JSON.stringify(saleInProgress.payments));
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // --- CORREÇÃO AQUI ---
+        // A variável 'change' agora é declarada aqui fora, garantindo que ela sempre exista.
+        let change = 0;
+
+        if (totalPaid > saleTotal) {
+            change = totalPaid - saleTotal; // O valor é atribuído aqui
+            let totalPaidInCash = payments
+                .filter(p => p.method === 'Dinheiro')
+                .reduce((sum, p) => sum + p.amount, 0);
+            
+            if (totalPaidInCash >= change) { // Cenário de Troco Normal
+                let changeToDeduct = change;
+                for (let i = payments.length - 1; i >= 0; i--) {
+                    if (payments[i].method === 'Dinheiro') {
+                        const deduction = Math.min(payments[i].amount, changeToDeduct);
+                        payments[i].amount -= deduction;
+                        changeToDeduct -= deduction;
+                        if (changeToDeduct <= 0) break;
+                    }
+                }
+            } 
+            else { // Cenário de Cashback
+                const nonCashPayments = payments.filter(p => p.method !== 'Dinheiro');
+                const cashToReturn = change - totalPaidInCash;
+                payments = [...nonCashPayments];
+                payments.push({ method: 'Dinheiro', amount: -cashToReturn });
+            }
+            saleInProgress.payments = payments.filter(p => p.amount !== 0);
+        }
+        
+        const customerId = document.getElementById('payment-modal-customer-select').value;
+        saleInProgress.customerId = customerId;
+
+        if (saleInProgress.payments.length === 1 && saleInProgress.payments[0].method === 'Fiado') {
+             if (customerId === "1") {
+                showModal('Ação Inválida', 'Selecione um cliente para vendas a fiado.');
+                return;
+            }
+            const customerRef = doc(db, "customers", customerId);
+            const customer = customers.find(c => c.id === customerId);
+            const newDebt = (customer.debt || 0) + saleInProgress.total;
+            await updateDoc(customerRef, { debt: newDebt });
+        }
+        
+        const activeShift = currentDay.shifts.find(s => !s.endTime);
+        if (!activeShift) {
+            showModal('Erro', 'Nenhum turno ativo para registrar a venda.');
             return;
         }
-        const customerRef = doc(db, "customers", customerId);
-        const customer = customers.find(c => c.id === customerId);
-        const newDebt = (customer.debt || 0) + saleInProgress.total;
-        await updateDoc(customerRef, {
-            debt: newDebt
-        });
-        saleInProgress.payments = [{
-            method: 'Fiado',
-            amount: saleInProgress.total
-        }];
-    }
 
-    // Find the current active shift within currentDay.shifts
-    const activeShift = currentDay.shifts.find(s => !s.endTime);
-    if (!activeShift) {
-        showModal('Erro', 'Nenhum turno ativo encontrado para registrar a venda.');
-        return;
-    }
+        saleInProgress.id = crypto.randomUUID();
+        saleInProgress.date = new Date().toISOString();
+        activeShift.sales.push(saleInProgress);
+        await updateCurrentDayInFirestore();
 
-    saleInProgress.id = (activeShift.sales.length + 1);
-    saleInProgress.date = new Date().toISOString();
-    activeShift.sales.push(saleInProgress); // Push to the found active shift
-
-    await updateCurrentDayInFirestore(); // Persist sales immediately
-
-    const lowStockProducts = [];
-    // Update stock in Firestore
-    for (const cartItem of saleInProgress.items) {
-        // --- CORREÇÃO APLICADA AQUI ---
-        // Verificamos se o item possui um 'id'. Itens "Diversos" não possuem,
-        // então o código dentro deste 'if' será ignorado para eles.
-        if (cartItem.id) {
-            const productRef = doc(db, "products", cartItem.id);
-            const newStock = cartItem.stock - cartItem.quantity;
-            await updateDoc(productRef, {
-                stock: newStock
-            });
-            if (newStock <= cartItem.minStock) {
-                lowStockProducts.push(cartItem.name);
+        for (const cartItem of saleInProgress.items) {
+            if (cartItem.id) {
+                const productRef = doc(db, "products", cartItem.id);
+                const newStock = cartItem.stock - cartItem.quantity;
+                await updateDoc(productRef, { stock: newStock });
             }
         }
+        
+        const customer = customers.find(c => c.id === saleInProgress.customerId);
+        await logActivity('VENDA_CRIADA', {
+            saleId: saleInProgress.id,
+            total: saleInProgress.total,
+            customerName: customer ? customer.name : 'Consumidor'
+        }, currentShift.openedBy);
+
+        await loadInitialData();
+        renderAll();
+        resetPdv();
+        
+        renderReceipt(saleInProgress, change); // Agora a variável 'change' sempre existe
+        closePaymentModal();
+
+    } catch (error) {
+        console.error("Erro ao confirmar venda:", error);
+        showModal("Erro", "Não foi possível confirmar a venda. Tente novamente.");
+    } finally {
+        confirmButton.disabled = false;
+        confirmButton.textContent = 'Confirmar Venda';
     }
-
-    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
-    const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
-
-    const customer = customers.find(c => c.id === saleInProgress.customerId);
-    await logActivity('VENDA_CRIADA', {
-        saleId: saleInProgress.id,
-        shiftId: currentShift.id,
-        total: saleInProgress.total,
-        customerName: customer ? customer.name : 'Consumidor',
-        items: saleInProgress.items.map(i => `${i.quantity}x ${i.name}`)
-    }, currentShift.openedBy);
-
-    await loadInitialData();
-    renderAll();
-    resetPdv();
-    closePaymentModal();
-
-    let warning = '';
-    if (lowStockProducts.length > 0) {
-        warning = `Atenção: ${lowStockProducts.join(', ')} atingiu/atingiram o estoque mínimo.`;
-    }
-    renderReceipt(saleInProgress, change, warning);
 }
 
 function renderReceipt(saleData, change, warning = '') {
@@ -1821,7 +1841,6 @@ function renderReceipt(saleData, change, warning = '') {
     document.getElementById('receipt-store-address').textContent = ci.address;
     document.getElementById('receipt-store-cnpj').textContent = ci.cnpj;
     document.getElementById('receipt-store-message').textContent = ci.receiptMessage;
-
     document.getElementById('receipt-date').textContent = formatDateTime(saleData.date);
     document.getElementById('receipt-sale-id').textContent = saleData.id;
     document.getElementById('receipt-shift-id').textContent = currentShift.id;
@@ -1833,11 +1852,11 @@ function renderReceipt(saleData, change, warning = '') {
     itemsEl.innerHTML = '';
     saleData.items.forEach(item => {
         const itemHTML = `
-                    <div>
-                        <p>${item.quantity}x ${item.name}</p>
-                        <p class="text-right">${formatCurrency(item.price * item.quantity)}</p>
-                    </div>
-                `;
+            <div>
+                <p>${item.quantity}x ${item.name}</p>
+                <p class="text-right">${formatCurrency(item.price * item.quantity)}</p>
+            </div>
+        `;
         itemsEl.innerHTML += itemHTML;
     });
 
@@ -1845,9 +1864,16 @@ function renderReceipt(saleData, change, warning = '') {
 
     const paymentsEl = document.getElementById('receipt-payments');
     paymentsEl.innerHTML = '';
-    saleData.payments.forEach(p => {
+    
+    // --- CORREÇÃO APLICADA AQUI ---
+    // Filtramos a lista de pagamentos para mostrar APENAS os valores positivos (o que o cliente pagou).
+    // O pagamento negativo de cashback, que é um controle interno, será ignorado no recibo.
+    const customerPayments = saleData.payments.filter(p => p.amount > 0);
+
+    customerPayments.forEach(p => {
         paymentsEl.innerHTML += `<p>${p.method}: <span>${formatCurrency(p.amount)}</span></p>`;
     });
+    // --- FIM DA CORREÇÃO ---
 
     document.getElementById('receipt-change').textContent = formatCurrency(change);
 
