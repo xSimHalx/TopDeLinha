@@ -273,7 +273,143 @@ async function logActivity(type, details, user = 'Sistema') {
 }
 
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
-const releaseNotes = [{ version: '1.6.1', date: '11/09/2025', notes: ['Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'] }, { version: '1.6.0', date: '11/09/2025', notes: ['Reorganizados os botões na tela de PDV para melhor usabilidade.', 'Adicionado botão "Escanear" com a câmera no PDV.'] }, { version: '1.5.9', date: '11/09/2025', notes: ['Adicionado botão [X] para remover itens diretamente do carrinho.', 'Melhorada a visualização dos itens no carrinho com mais detalhes.'] }, { version: '1.5.8', date: '11/09/2025', notes: ['Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',] }, { version: '1.5.7', date: '11/09/2025', notes: ['Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.', 'Melhorada a robustez da função de atualização de clientes.'] }, { version: '1.5.6', date: '11/09/2025', notes: ['Adicionada opção de pagamento "Fiado" no modal de pagamento.'] }, { version: '1.5.5', date: '11/09/2025', notes: ['Corrigido o botão "Diversos" que não estava funcionando corretamente.'] }, { version: '1.5.4', date: '11/09/2025', notes: ['Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.'] }, { version: '1.5.3', date: '11/09/2025', notes: ['Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.'] }, { version: '1.5.2', date: '11/09/2025', notes: ['Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.'] }, { version: '1.5.1', date: '11/09/2025', notes: ['Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'] }, { version: '1.5.0', date: '10/09/2025', notes: ['Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).', 'Implementada leitura de códigos de barra de balança (iniciados com \'2\') para extrair SKU e preço.'] }, { version: '1.4.0', date: '10/09/2025', notes: ['Limites de historico de atividades aumentado, de 50 para 300'] }, { version: '1.3.0', date: '10/09/2025', notes: ['Adicionado filtro de data na aba de relatórios.', 'Alterada a ordem de exibição do log de atividades para mostrar os itens mais recentes primeiro.'] }, { version: '1.2.1', date: '10/09/2025', notes: ['Adicionada seção de "Novidades da Versão" ao Painel.', 'Corrigido o alerta de estoque baixo no painel para usar o valor mínimo definido por produto.', 'Adicionado aviso de estoque mínimo no recibo após a venda.'] }, { version: '1.1.0', date: '09/09/2025', notes: ['Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.', 'Tradução de mais elementos da interface para Português (Brasil).'] }, { version: '1.0.0', date: '01/09/2025', notes: ['Lançamento inicial do sistema TopDeLinha PDV.'] }];
+const releaseNotes = [
+    {
+        version: '1.6.2',
+        date: '12/09/2025',
+        notes: [
+            'Para melhorar visibilidade em dispositivos móveis o teclado numérico foi alterado.',
+            'Ao adicionar um produto ao carrinho, o campo é automaticamente limpo e o foco é mantido para facilitar a adição de múltiplos itens rapidamente.'
+        ]
+    },
+    {
+        version: '1.6.1',
+        date: '11/09/2025',
+        notes: [
+            'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
+        ]
+    },
+    {
+        version: '1.6.0',
+        date: '11/09/2025',
+        notes: [
+            'Reorganizados os botões na tela de PDV para melhor usabilidade.',
+            'Adicionado botão "Escanear" com a câmera no PDV.'
+        ]
+    },
+    {
+        version: '1.5.9',
+        date: '11/09/2025',
+        notes: [
+            'Adicionado botão [X] para remover itens diretamente do carrinho.',
+            'Melhorada a visualização dos itens no carrinho com mais detalhes.'
+        ]
+    },
+    {
+        version: '1.5.8',
+        date: '11/09/2025',
+        notes: [
+            'Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',
+        ]
+    },
+    {
+        version: '1.5.7',
+        date: '11/09/2025',
+        notes: [
+            'Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.',
+            'Melhorada a robustez da função de atualização de clientes.'
+        ]
+    },
+    {
+        version: '1.5.6',
+        date: '11/09/2025',
+        notes: [
+            'Adicionada opção de pagamento "Fiado" no modal de pagamento.'
+        ]
+    },
+    {
+        version: '1.5.5',
+        date: '11/09/2025',
+        notes: [
+            'Corrigido o botão "Diversos" que não estava funcionando corretamente.'
+        ]
+    },
+    {
+        version: '1.5.4',
+        date: '11/09/2025',
+        notes: [
+            'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.'
+        ]
+    },
+    {
+        version: '1.5.3',
+        date: '11/09/2025',
+        notes: [
+            'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.'
+        ]
+    },
+    {
+        version: '1.5.2',
+        date: '11/09/2025',
+        notes: [
+            'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.'
+        ]
+    },
+    {
+        version: '1.5.1',
+        date: '11/09/2025',
+        notes: [
+            'Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'
+        ]
+    },
+    {
+        version: '1.5.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
+            'Implementada leitura de códigos de barra de balança (iniciados com \'2\') para extrair SKU e preço.'
+        ]
+    },
+    {
+        version: '1.4.0',
+        date: '10/09/2025',
+        notes: [
+            'Limites de historico de atividades aumentado, de 50 para 300'
+        ]
+    },
+    {
+        version: '1.3.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionado filtro de data na aba de relatórios.',
+            'Alterada a ordem de exibição do log de atividades para mostrar os itens mais recentes primeiro.'
+        ]
+    },
+    {
+        version: '1.2.1',
+        date: '10/09/2025',
+        notes: [
+            'Adicionada seção de "Novidades da Versão" ao Painel.',
+            'Corrigido o alerta de estoque baixo no painel para usar o valor mínimo definido por produto.',
+            'Adicionado aviso de estoque mínimo no recibo após a venda.'
+        ]
+    },
+    {
+        version: '1.1.0',
+        date: '09/09/2025',
+        notes: [
+            'Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.',
+            'Tradução de mais elementos da interface para Português (Brasil).'
+        ]
+    },
+    {
+        version: '1.0.0',
+        date: '01/09/2025',
+        notes: [
+            'Lançamento inicial do sistema TopDeLinha PDV.'
+        ]
+    }
+];
 
 function renderReleaseNotes() {
     const container = document.getElementById('release-notes-container');
