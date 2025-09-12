@@ -299,6 +299,12 @@ async function logActivity(type, details, user = 'Sistema') {
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+    version: '1.6.1',
+    date: '11/09/2025',
+    notes: [
+        'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
+    ]
+}, {
     version: '1.6.0',
     date: '11/09/2025',
     notes: [
@@ -635,9 +641,9 @@ function renderInventoryTab() {
                             <input type="text" id="new-sku" placeholder="Código Interno (SKU)" required class="w-full p-2 border rounded">
                             <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
                             <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
                         </form>
                     </div>
@@ -895,7 +901,7 @@ async function renderActivityTab() {
             logsByDay[dia].push(log);
         });
         let html = '';
-        Object.keys(logsByDay).reverse().forEach(dia => {
+        Object.keys(logsByDay).forEach(dia => {
             html += `<h4 class="mt-6 mb-2 text-lg font-bold text-gray-700">${dia}</h4>`;
             html += logsByDay[dia].map(log => {
                 let detailsText = '';
@@ -1626,8 +1632,8 @@ function handleCheckout() {
 }
 
 function renderPaymentModal() {
-    const total = saleInProgress.total;
-    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+    const total = parseFloat(saleInProgress.total.toFixed(2));
+    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
     const change = totalPaid > total ? totalPaid - total : 0;
     const customerId = document.getElementById('payment-modal-customer-select')?.value || saleInProgress.customerId;
 
@@ -1728,8 +1734,13 @@ async function confirmSale() {
         const customerRef = doc(db, "customers", customerId);
         const customer = customers.find(c => c.id === customerId);
         const newDebt = (customer.debt || 0) + saleInProgress.total;
-        await updateDoc(customerRef, { debt: newDebt });
-        saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
+        await updateDoc(customerRef, {
+            debt: newDebt
+        });
+        saleInProgress.payments = [{
+            method: 'Fiado',
+            amount: saleInProgress.total
+        }];
     }
 
     // Find the current active shift within currentDay.shifts
@@ -1748,11 +1759,18 @@ async function confirmSale() {
     const lowStockProducts = [];
     // Update stock in Firestore
     for (const cartItem of saleInProgress.items) {
-        const productRef = doc(db, "products", cartItem.id);
-        const newStock = cartItem.stock - cartItem.quantity;
-        await updateDoc(productRef, { stock: newStock });
-        if (newStock <= cartItem.minStock) {
-            lowStockProducts.push(cartItem.name);
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Verificamos se o item possui um 'id'. Itens "Diversos" não possuem,
+        // então o código dentro deste 'if' será ignorado para eles.
+        if (cartItem.id) {
+            const productRef = doc(db, "products", cartItem.id);
+            const newStock = cartItem.stock - cartItem.quantity;
+            await updateDoc(productRef, {
+                stock: newStock
+            });
+            if (newStock <= cartItem.minStock) {
+                lowStockProducts.push(cartItem.name);
+            }
         }
     }
 
