@@ -1487,11 +1487,24 @@ export function resetPdv() {
         barcodeInput.focus();
     }
 }
+// --- FUNÇÃO AUXILIAR PARA FOCAR NO CÓDIGO DE BARRAS ---
+function focusOnBarcode() {
+    // Encontra o campo de input do código de barras
+    const barcodeInput = document.getElementById('barcode-input-field');
+    
+    // Se o campo existir na tela...
+    if (barcodeInput) {
+        // ...foca o cursor nele
+        barcodeInput.focus();
+        // (Bônus) seleciona qualquer texto que já esteja lá
+        barcodeInput.select();          
+    }
+}
 
 function startNewSale() {
-    document.getElementById('pdv-idle-screen').classList.add('hidden');
-    document.getElementById('pdv-active-sale').classList.remove('hidden');
-    document.getElementById('barcode-input-field').focus();
+    document.getElementById('pdv-idle-screen')?.classList.add('hidden');
+    document.getElementById('pdv-active-sale')?.classList.remove('hidden');
+    focusOnBarcode(); // <-- MUDANÇA AQUI
 }
 
 function handleBarcodeKeypress(e) {
@@ -1554,6 +1567,8 @@ export function addToCart(sku, scannedPrice = null) { // Added scannedPrice para
         cart.push({ ...product, quantity: 1, price: scannedPrice !== null ? scannedPrice : product.price }); // Use scannedPrice if available
     }
     renderCart();
+    focusOnBarcode(); // <-- Adicionar aqui
+
 }
 
 function renderCart() {
@@ -1706,6 +1721,8 @@ function addDiversosToCart(itemName, itemPrice) {
     cart.push(cartItem);
     renderCart();
     closeDiversosModal();
+    focusOnBarcode(); // <-- Adicionar aqui
+
 }
 
 function handleDiversosItemClick(e) {
@@ -1850,10 +1867,12 @@ function renderReceipt(saleData, change, warning = '') {
 function printReceipt() {
     window.print();
 }
-
 function closeReceiptModal() {
     receiptModal.querySelector('div').classList.remove('scale-100');
-    setTimeout(() => receiptModal.classList.add('hidden'), 200);
+    setTimeout(() => {
+        receiptModal.classList.add('hidden');
+        focusOnBarcode(); // <-- Adicionar aqui
+    }, 200);
 }
 
 async function handleOpenDrawer(silent = false) {
