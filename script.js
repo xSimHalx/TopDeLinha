@@ -754,27 +754,32 @@ function displayFilteredReports(daysToDisplay) {
     if (!container) return;
 
     if (daysToDisplay.length === 0) {
-        container.innerHTML = `<p id="no-sessions-message" class="text-gray-500 text-center py-8">Nenhum relatório encontrado para o período selecionado.</p>`;
+        container.innerHTML = `<p class="text-gray-500 text-center py-8">Nenhum relatório encontrado.</p>`;
         return;
     }
 
     let reportsHTML = '';
     daysToDisplay.forEach(day => {
-        const allSales = day.shifts.flatMap(s => s.sales);
-        const allDebtPayments = day.shifts.flatMap(s => s.debtPayments);
+        const allSales = day.shifts.flatMap(s => s.sales || []);
+        const allDebtPayments = day.shifts.flatMap(s => s.debtPayments || []);
         const totalSalesValue = allSales.reduce((sum, sale) => sum + sale.total, 0);
 
+        // --- LÓGICA DE CÁLCULO CORRIGIDA ---
+        // 1. Cria um resumo de pagamentos com base APENAS nas vendas.
         const paymentsSummary = allSales.flatMap(s => s.payments).reduce((acc, p) => {
             acc[p.method] = (acc[p.method] || 0) + p.amount;
             return acc;
         }, {});
 
+        // 2. SOMA os recebimentos de dívidas a esse resumo.
         allDebtPayments.forEach(p => {
             paymentsSummary[p.method] = (paymentsSummary[p.method] || 0) + p.amount;
         });
 
+        // 3. Calcula o caixa final com base no valor UNIFICADO.
         const totalCashIn = paymentsSummary['Dinheiro'] || 0;
-        const expectedCashInDrawer = day.initialCash + totalCashIn;
+        const expectedCashInDrawer = (day.initialCash || 0) + totalCashIn;
+        // --- FIM DA LÓGICA CORRIGIDA ---
 
         let shiftsDetailsHTML = day.shifts.map(shift => {
             const shiftTotal = shift.sales.reduce((sum, s) => sum + s.total, 0);
@@ -785,7 +790,7 @@ function displayFilteredReports(daysToDisplay) {
                     <p class="text-xs text-gray-500">Período: ${formatDateTime(shift.startTime)} - ${formatDateTime(shift.endTime)}</p>
                     <p class="text-sm">Vendas no turno: ${formatCurrency(shiftTotal)}</p>
                 </div>`
-            )
+            );
         }).join('');
 
         let debtPaymentsHTML = allDebtPayments.length > 0 ? allDebtPayments.map(p => (
@@ -832,7 +837,6 @@ function displayFilteredReports(daysToDisplay) {
     });
     container.innerHTML = reportsHTML;
 }
-
 async function renderActivityTab() {
     contentActivities.innerHTML = `
         <div class="flex flex-wrap gap-4 mb-4">
@@ -1488,12 +1492,19 @@ window.removeFromCart = function (sku) {
 
 function handleCheckout() {
     if (cart.length === 0) return;
+
+    // Calcula o valor total primeiro
+    const totalValue = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
     saleInProgress = {
         items: JSON.parse(JSON.stringify(cart)),
-        total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        // --- MUDANÇA AQUI: ARREDONDAMENTO PARA 2 CASAS DECIMAIS ---
+        // Garante que o total nunca terá problemas de ponto flutuante.
+        total: parseFloat(totalValue.toFixed(2)),
         payments: [],
         customerId: '1',
     };
+
     selectedPaymentMethod = 'Dinheiro';
     renderPaymentModal();
     paymentModal.classList.remove('hidden');
@@ -1548,12 +1559,28 @@ function renderPaymentModal() {
 
 function handleAddPayment(event) {
     event.preventDefault();
-    const amount = parseCurrency(document.getElementById('payment-amount').value);
+    let amount = parseCurrency(document.getElementById('payment-amount').value);
+    
     if (isNaN(amount) || amount <= 0) {
         showModal('Erro', 'Valor de pagamento inválido.');
         return;
     }
-    saleInProgress.payments.push({ method: selectedPaymentMethod, amount });
+
+    const total = parseFloat(saleInProgress.total.toFixed(2));
+    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
+    const remainingAmount = total - totalPaid;
+
+    // --- LÓGICA INTELIGENTE ADICIONADA AQUI ---
+    // Se o pagamento for em Dinheiro e o valor inserido for maior que o necessário...
+    if (selectedPaymentMethod === 'Dinheiro' && amount > remainingAmount) {
+        // ...registramos apenas o valor que faltava pagar. O resto é troco.
+        saleInProgress.payments.push({ method: selectedPaymentMethod, amount: remainingAmount });
+    } else {
+        // Para todos os outros casos (Pix, Cartão, ou Dinheiro com valor exato/menor),
+        // registramos o valor total inserido.
+        saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
+    }
+
     renderPaymentModal();
 }
 
@@ -1599,58 +1626,91 @@ function handleDiversosItemClick(e) {
 }
 
 async function confirmSale() {
-    const customerId = document.getElementById('payment-modal-customer-select').value;
-    saleInProgress.customerId = customerId;
-    if (selectedPaymentMethod === 'Fiado') {
-        if (customerId === "1") {
-            showModal('Ação Inválida', 'Selecione um cliente cadastrado para vendas a fiado.');
+    const confirmButton = document.getElementById('confirm-sale-button');
+    // --- MUDANÇA 1: TRAVA ANTI-CLIQUE DUPLO ---
+    // Trava o botão imediatamente para evitar que o usuário clique várias vezes.
+    confirmButton.disabled = true;
+    confirmButton.textContent = 'Processando...';
+
+    try {
+        const customerId = document.getElementById('payment-modal-customer-select').value;
+        saleInProgress.customerId = customerId;
+
+        if (selectedPaymentMethod === 'Fiado') {
+            if (customerId === "1") {
+                showModal('Ação Inválida', 'Selecione um cliente para vendas a fiado.');
+                // Se der erro, destrava o botão antes de sair
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Confirmar Venda';
+                return;
+            }
+            const customerRef = doc(db, "customers", customerId);
+            const customer = customers.find(c => c.id === customerId);
+            const newDebt = (customer.debt || 0) + saleInProgress.total;
+            await updateDoc(customerRef, { debt: newDebt });
+            saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
+        }
+
+        const activeShift = currentDay.shifts.find(s => !s.endTime);
+        if (!activeShift) {
+            showModal('Erro', 'Nenhum turno ativo para registrar a venda.');
+            // Se der erro, destrava o botão antes de sair
+            confirmButton.disabled = false;
+            confirmButton.textContent = 'Confirmar Venda';
             return;
         }
-        const customerRef = doc(db, "customers", customerId);
-        const customer = customers.find(c => c.id === customerId);
-        const newDebt = (customer.debt || 0) + saleInProgress.total;
-        await updateDoc(customerRef, { debt: newDebt });
-        saleInProgress.payments = [{ method: 'Fiado', amount: saleInProgress.total }];
-    }
-    const activeShift = currentDay.shifts.find(s => !s.endTime);
-    if (!activeShift) {
-        showModal('Erro', 'Nenhum turno ativo encontrado para registrar a venda.');
-        return;
-    }
-    saleInProgress.id = (activeShift.sales.length + 1);
-    saleInProgress.date = new Date().toISOString();
-    activeShift.sales.push(saleInProgress);
-    await updateCurrentDayInFirestore();
-    const lowStockProducts = [];
-    for (const cartItem of saleInProgress.items) {
-        if (cartItem.id) {
-            const productRef = doc(db, "products", cartItem.id);
-            const newStock = cartItem.stock - cartItem.quantity;
-            await updateDoc(productRef, { stock: newStock });
-            if (newStock <= cartItem.minStock) {
-                lowStockProducts.push(cartItem.name);
+
+        // --- MUDANÇA 2: ID ÚNICO E SEGURO ---
+        // Garante que cada venda tenha um ID único que nunca se repetirá.
+        saleInProgress.id = crypto.randomUUID();
+        saleInProgress.date = new Date().toISOString();
+        activeShift.sales.push(saleInProgress);
+
+        await updateCurrentDayInFirestore();
+
+        const lowStockProducts = [];
+        for (const cartItem of saleInProgress.items) {
+            if (cartItem.id) { // Proteção para itens "Diversos"
+                const productRef = doc(db, "products", cartItem.id);
+                const newStock = cartItem.stock - cartItem.quantity;
+                await updateDoc(productRef, { stock: newStock });
+                if (newStock <= cartItem.minStock) {
+                    lowStockProducts.push(cartItem.name);
+                }
             }
         }
+
+        const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+        const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
+
+        const customer = customers.find(c => c.id === saleInProgress.customerId);
+        await logActivity('VENDA_CRIADA', {
+            saleId: saleInProgress.id,
+            shiftId: currentShift.id,
+            total: saleInProgress.total,
+            customerName: customer ? customer.name : 'Consumidor',
+            items: saleInProgress.items.map(i => `${i.quantity}x ${i.name}`)
+        }, currentShift.openedBy);
+
+        await loadInitialData();
+        renderAll();
+        resetPdv();
+        closePaymentModal();
+
+        let warning = '';
+        if (lowStockProducts.length > 0) {
+            warning = `Atenção: ${lowStockProducts.join(', ')} atingiu/atingiram o estoque mínimo.`;
+        }
+        renderReceipt(saleInProgress, change, warning);
+
+    } catch (error) {
+        console.error("Erro ao confirmar venda:", error);
+        showModal("Erro", "Não foi possível confirmar a venda. Tente novamente.");
+    } finally {
+        // Garante que o botão volte ao normal, mesmo que a venda falhe
+        confirmButton.disabled = false;
+        confirmButton.textContent = 'Confirmar Venda';
     }
-    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
-    const change = totalPaid > saleInProgress.total ? totalPaid - saleInProgress.total : 0;
-    const customer = customers.find(c => c.id === saleInProgress.customerId);
-    await logActivity('VENDA_CRIADA', {
-        saleId: saleInProgress.id,
-        shiftId: currentShift.id,
-        total: saleInProgress.total,
-        customerName: customer ? customer.name : 'Consumidor',
-        items: saleInProgress.items.map(i => `${i.quantity}x ${i.name}`)
-    }, currentShift.openedBy);
-    await loadInitialData();
-    renderAll();
-    resetPdv();
-    closePaymentModal();
-    let warning = '';
-    if (lowStockProducts.length > 0) {
-        warning = `Atenção: ${lowStockProducts.join(', ')} atingiu/atingiram o estoque mínimo.`;
-    }
-    renderReceipt(saleInProgress, change, warning);
 }
 
 function renderReceipt(saleData, change, warning = '') {
