@@ -649,8 +649,8 @@ function renderInventoryTab() {
                             <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
                             <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
                             <input type="tel" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
+                            <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
                         </form>
                     </div>
@@ -1752,8 +1752,8 @@ function handleDiversosItemClick(e) {
     if (e.target.classList.contains('diversos-item-btn')) {
         const itemName = e.target.dataset.item;
         const priceStr = prompt(`Digite o valor para "${itemName}":`);
-        const price = parseFloat(priceStr);
-
+        const price = parseCurrency(priceStr);
+        
         if (!isNaN(price) && price > 0) {
             addDiversosToCart(itemName, price);
         } else if (priceStr !== null) {
@@ -2017,19 +2017,21 @@ async function handleAddProduct(event) {
 
     const sku = document.getElementById('new-sku').value.trim();
     const barcode = document.getElementById('new-barcode').value.trim();
-    // NEW: Barcode validation
+
+    // Adicionado validação para múltiplos tamanhos de códigos de barras
     if (barcode !== '') {
+        const validLengths = [8, 12, 13];
         if (!/^\d+$/.test(barcode)) {
             showModal('Erro de Código de Barras', 'O código de barras deve conter apenas números.');
             return;
         }
-        if (barcode.length !== 13) {
-            showModal('Erro de Código de Barras', 'O código de barras deve ter 13 dígitos (padrão EAN-13).');
+        if (!validLengths.includes(barcode.length)) {
+            showModal('Erro de Código de Barras', 'O código de barras deve ter 8, 12 ou 13 dígitos (padrões EAN-8, UPC-A ou EAN-13).');
             return;
         }
     }
     const name = document.getElementById('new-name').value.trim();
-    const price = parseFloat(document.getElementById('new-price').value);
+    const price = parseCurrency(document.getElementById('new-price').value);
     const stock = parseInt(document.getElementById('new-stock').value);
     const minStock = parseInt(document.getElementById('new-min-stock').value);
 
