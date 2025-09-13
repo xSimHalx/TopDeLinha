@@ -62,6 +62,13 @@ const receiptModal = document.getElementById('receipt-modal');
 const diversosModal = document.getElementById('diversos-modal');
 
 // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
+function debounce(func, delay = 400) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => { func.apply(this, args); }, delay);
+    };
+}
 export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // Função para converter string monetária (pt-BR) para número
 export const parseCurrency = (value) => {
@@ -1491,13 +1498,13 @@ export function resetPdv() {
 function focusOnBarcode() {
     // Encontra o campo de input do código de barras
     const barcodeInput = document.getElementById('barcode-input-field');
-    
+
     // Se o campo existir na tela...
     if (barcodeInput) {
         // ...foca o cursor nele
         barcodeInput.focus();
         // (Bônus) seleciona qualquer texto que já esteja lá
-        barcodeInput.select();          
+        barcodeInput.select();
     }
 }
 
@@ -1507,6 +1514,8 @@ function startNewSale() {
     focusOnBarcode(); // <-- MUDANÇA AQUI
 }
 
+// ... (seu código anterior)
+
 function handleBarcodeKeypress(e) {
     if (e.key === 'Enter' && e.target.value.trim()) {
         e.preventDefault();
@@ -1514,6 +1523,20 @@ function handleBarcodeKeypress(e) {
         e.target.value = '';
     }
 }
+
+// --- COLOQUE A NOVA FUNÇÃO AQUI ---
+const handleBarcodeAutoDetect = debounce((inputElement) => {
+    const code = inputElement.value.trim();
+    const validLengths = [8, 12, 13]; // Tamanhos de códigos de barras comuns (EAN-8, UPC-A, EAN-13)
+
+    if (validLengths.includes(code.length)) {
+        console.log(`Código com tamanho válido detectado: ${code}. Processando...`);
+        handleBarcodeScan(code);
+        inputElement.value = ''; // Limpa o campo após o processamento
+    }
+});
+// ------------------------------------
+
 
 function handleBarcodeScan(scannedCode) {
     // Check for scale barcode (starts with '2')
@@ -1744,55 +1767,62 @@ async function confirmSale() {
     confirmButton.disabled = true;
     confirmButton.textContent = 'Processando...';
 
+    const customerId = document.getElementById('payment-modal-customer-select').value;
+    saleInProgress.customerId = customerId;
+
     try {
         const saleTotal = saleInProgress.total;
-        let payments = JSON.parse(JSON.stringify(saleInProgress.payments));
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-        
-        // --- CORREÇÃO AQUI ---
-        // A variável 'change' agora é declarada aqui fora, garantindo que ela sempre exista.
         let change = 0;
 
-        if (totalPaid > saleTotal) {
-            change = totalPaid - saleTotal; // O valor é atribuído aqui
-            let totalPaidInCash = payments
-                .filter(p => p.method === 'Dinheiro')
-                .reduce((sum, p) => sum + p.amount, 0);
-            
-            if (totalPaidInCash >= change) { // Cenário de Troco Normal
-                let changeToDeduct = change;
-                for (let i = payments.length - 1; i >= 0; i--) {
-                    if (payments[i].method === 'Dinheiro') {
-                        const deduction = Math.min(payments[i].amount, changeToDeduct);
-                        payments[i].amount -= deduction;
-                        changeToDeduct -= deduction;
-                        if (changeToDeduct <= 0) break;
-                    }
-                }
-            } 
-            else { // Cenário de Cashback
-                const nonCashPayments = payments.filter(p => p.method !== 'Dinheiro');
-                const cashToReturn = change - totalPaidInCash;
-                payments = [...nonCashPayments];
-                payments.push({ method: 'Dinheiro', amount: -cashToReturn });
-            }
-            saleInProgress.payments = payments.filter(p => p.amount !== 0);
-        }
-        
-        const customerId = document.getElementById('payment-modal-customer-select').value;
-        saleInProgress.customerId = customerId;
-
-        if (saleInProgress.payments.length === 1 && saleInProgress.payments[0].method === 'Fiado') {
-             if (customerId === "1") {
+        // SE O MÉTODO SELECIONADO FOR FIADO
+        if (selectedPaymentMethod === 'Fiado') {
+            if (customerId === "1") {
                 showModal('Ação Inválida', 'Selecione um cliente para vendas a fiado.');
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Confirmar Venda';
                 return;
             }
+            // Adiciona o pagamento Fiado para que ele apareça no recibo
+            saleInProgress.payments = [{ method: 'Fiado', amount: saleTotal }];
+
+            // Atualiza a dívida do cliente
             const customerRef = doc(db, "customers", customerId);
             const customer = customers.find(c => c.id === customerId);
-            const newDebt = (customer.debt || 0) + saleInProgress.total;
+            const newDebt = (customer.debt || 0) + saleTotal;
             await updateDoc(customerRef, { debt: newDebt });
+
+        } else { // LÓGICA DE PAGAMENTO NORMAL (NÃO-FIADO)
+
+            const payments = JSON.parse(JSON.stringify(saleInProgress.payments));
+            const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+            if (totalPaid > saleTotal) {
+                change = totalPaid - saleTotal;
+                let totalPaidInCash = payments
+                    .filter(p => p.method === 'Dinheiro')
+                    .reduce((sum, p) => sum + p.amount, 0);
+
+                if (totalPaidInCash >= change) {
+                    let changeToDeduct = change;
+                    for (let i = payments.length - 1; i >= 0; i--) {
+                        if (payments[i].method === 'Dinheiro') {
+                            const deduction = Math.min(payments[i].amount, changeToDeduct);
+                            payments[i].amount -= deduction;
+                            changeToDeduct -= deduction;
+                            if (changeToDeduct <= 0) break;
+                        }
+                    }
+                } else {
+                    const nonCashPayments = payments.filter(p => p.method !== 'Dinheiro');
+                    const cashToReturn = change - totalPaidInCash;
+                    payments = [...nonCashPayments];
+                    payments.push({ method: 'Dinheiro', amount: -cashToReturn });
+                }
+                saleInProgress.payments = payments.filter(p => p.amount !== 0);
+            }
         }
         
+        // RESTANTE DA LÓGICA COMUM A AMBOS OS CENÁRIOS
         const activeShift = currentDay.shifts.find(s => !s.endTime);
         if (!activeShift) {
             showModal('Erro', 'Nenhum turno ativo para registrar a venda.');
@@ -1811,7 +1841,7 @@ async function confirmSale() {
                 await updateDoc(productRef, { stock: newStock });
             }
         }
-        
+
         const customer = customers.find(c => c.id === saleInProgress.customerId);
         await logActivity('VENDA_CRIADA', {
             saleId: saleInProgress.id,
@@ -1822,8 +1852,8 @@ async function confirmSale() {
         await loadInitialData();
         renderAll();
         resetPdv();
-        
-        renderReceipt(saleInProgress, change); // Agora a variável 'change' sempre existe
+
+        renderReceipt(saleInProgress, change);
         closePaymentModal();
 
     } catch (error) {
@@ -1864,7 +1894,7 @@ function renderReceipt(saleData, change, warning = '') {
 
     const paymentsEl = document.getElementById('receipt-payments');
     paymentsEl.innerHTML = '';
-    
+
     // --- CORREÇÃO APLICADA AQUI ---
     // Filtramos a lista de pagamentos para mostrar APENAS os valores positivos (o que o cliente pagou).
     // O pagamento negativo de cashback, que é um controle interno, será ignorado no recibo.
