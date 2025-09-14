@@ -309,6 +309,18 @@ const releaseNotes = [{
     version: '1.6.1',
     date: '11/09/2025',
     notes: [
+        'Melhoria de adicionar item ao estoque',
+        'Agora o sistema permite adicionar itens ao estoque através da busca por nome, facilitando a reposição rápida de produtos.',
+        'Somente codigo de barras com (8,12,13 ou sem codigo de barras) digitos são aceitos',
+        'Validação de SKU, Nome e Código de Barras duplicado ao adicionar novo produto.',
+        'Correção de bug na validação do código de barras ao adicionar novo produto.'
+        
+    ]
+}, {
+
+    version: '1.6.1',
+    date: '11/09/2025',
+    notes: [
         'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
     ]
 }, {
@@ -2017,8 +2029,12 @@ async function handleAddProduct(event) {
 
     const sku = document.getElementById('new-sku').value.trim();
     const barcode = document.getElementById('new-barcode').value.trim();
+    const name = document.getElementById('new-name').value.trim();
+    const price = parseCurrency(document.getElementById('new-price').value);
+    const stock = parseInt(document.getElementById('new-stock').value);
+    const minStock = parseInt(document.getElementById('new-min-stock').value);
 
-    // Adicionado validação para múltiplos tamanhos de códigos de barras
+    // 1. Validação do formato do código de barras
     if (barcode !== '') {
         const validLengths = [8, 12, 13];
         if (!/^\d+$/.test(barcode)) {
@@ -2030,20 +2046,23 @@ async function handleAddProduct(event) {
             return;
         }
     }
-    const name = document.getElementById('new-name').value.trim();
-    const price = parseCurrency(document.getElementById('new-price').value);
-    const stock = parseInt(document.getElementById('new-stock').value);
-    const minStock = parseInt(document.getElementById('new-min-stock').value);
 
+    // 2. Validação dos campos obrigatórios
     if (!sku || !name || isNaN(price) || isNaN(stock) || isNaN(minStock)) {
         showModal('Erro', 'Preencha todos os campos obrigatórios.');
         return;
     }
 
-    // Verificação de SKU duplicado
-    const existingProduct = products.find(p => p.sku.toLowerCase() === sku.toLowerCase());
+    // 3. Verificação de SKU, Nome e Código de Barras duplicado
+    const existingProduct = products.find(p => {
+        const isSkuDuplicate = p.sku.toLowerCase() === sku.toLowerCase();
+        const isNameDuplicate = p.name.toLowerCase() === name.toLowerCase();
+        const isBarcodeDuplicate = barcode !== '' && p.barcode === barcode;
+        return isSkuDuplicate || isNameDuplicate || isBarcodeDuplicate;
+    });
+
     if (existingProduct) {
-        showModal('SKU Duplicado', `O SKU "${sku}" já está sendo utilizado pelo produto "${existingProduct.name}". Por favor, use um código diferente.`);
+        showModal('Produto já existe', `Um produto com este SKU ou Código de Barras já está cadastrado: ${existingProduct.name}.`);
         return;
     }
 
