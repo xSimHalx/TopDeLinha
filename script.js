@@ -306,7 +306,7 @@ async function logActivity(type, details, user = 'Sistema') {
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
-    version: '1.6.1',
+    version: '1.7.0',
     date: '11/09/2025',
     notes: [
         'Melhoria de adicionar item ao estoque',
