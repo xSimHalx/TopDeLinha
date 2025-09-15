@@ -366,6 +366,60 @@
             </div>
         </div>
     </div>
+    <div id="edit-or-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
+        <div class="p-6 border-b text-center">
+            <h3 class="text-xl font-bold text-gray-900">Produto Encontrado!</h3>
+            <p id="edit-or-delete-modal-message" class="mt-2 text-sm text-gray-500"></p>
+        </div>
+        <div class="p-6 flex justify-around">
+            <button id="edit-product-choice-button" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700">Editar</button>
+            <button id="delete-product-choice-button" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Excluir</button>
+        </div>
+    </div>
+</div>
+<!-- Modal excluir e ditar estoque-->
+
+<div id="edit-product-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all scale-95">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-900">Editar Produto</h3>
+            <button onclick="closeEditProductModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <form id="edit-product-form" class="p-6 space-y-4">
+            <input type="hidden" id="edit-product-id">
+            <div>
+                <label for="edit-product-sku" class="block text-sm font-medium text-gray-700">Código Interno (SKU)</label>
+                <input type="text" id="edit-product-sku" required disabled class="mt-1 block w-full p-2 border rounded-md bg-gray-100 cursor-not-allowed">
+            </div>
+            <div>
+                <label for="edit-product-barcode" class="block text-sm font-medium text-gray-700">Código de Barras</label>
+                <input type="text" id="edit-product-barcode" class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label for="edit-product-name" class="block text-sm font-medium text-gray-700">Nome do Produto</label>
+                <input type="text" id="edit-product-name" required class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label for="edit-product-price" class="block text-sm font-medium text-gray-700">Preço (R$)</label>
+                <input type="tel" id="edit-product-price" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
+            </div>
+            <div>
+                <label for="edit-product-stock" class="block text-sm font-medium text-gray-700">Estoque</label>
+                <input type="number" id="edit-product-stock" required class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label for="edit-product-min-stock" class="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
+                <input type="number" id="edit-product-min-stock" required class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end space-x-2">
+                <button type="button" onclick="closeEditProductModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                <button type="submit" id="update-product-button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 
     <!-- Receipt Modal -->
     <div id="receipt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">

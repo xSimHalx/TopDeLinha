@@ -306,90 +306,67 @@ async function logActivity(type, details, user = 'Sistema') {
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
 const releaseNotes = [{
+
+    version: '1.8.0',
+    date: '15/09/2025',
+    notes: [
+        'Adicionado escaneamento de código de barras com a câmera na aba de Estoque (Visão Geral e Entrada Rápida).',
+        'Melhoria na pesquisa de produtos na aba de Estoque, agora é possível buscar por código de barras além do nome e SKU.',
+        'Correção de bug na validação do código de barras ao adicionar novo produto.',
+        'Adicionado função de de editar produto diretamente na tabela de estoque.',
+        'Adicionado função de deletar produto diretamente na tabela de estoque.',
+        'Adicionado confirmação ao deletar produto.',
+        'Melhoria na usabilidade do scanner de código de barras, com foco automático no campo de entrada após cada escaneamento.',
+        'tradução de mais elementos da interface para Português (Brasil).',
+        'Melhoria na performance geral do sistema.',
+        'Correção de bugs menores e melhorias na interface.',
+        'Adicionado o valor do produto na aba de estoque (Visão Geral).' 
+
+    ]
+}, {
     version: '1.7.0',
-    date: '11/09/2025',
+    date: '14/09/2025',
     notes: [
         'Melhoria de adicionar item ao estoque',
         'Agora o sistema permite adicionar itens ao estoque através da busca por nome, facilitando a reposição rápida de produtos.',
         'Somente codigo de barras com (8,12,13 ou sem codigo de barras) digitos são aceitos',
         'Validação de SKU, Nome e Código de Barras duplicado ao adicionar novo produto.',
         'Correção de bug na validação do código de barras ao adicionar novo produto.'
-        
+
     ]
 }, {
 
     version: '1.6.1',
-    date: '11/09/2025',
+    date: '13/09/2025',
     notes: [
         'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
     ]
 }, {
     version: '1.6.0',
-    date: '11/09/2025',
+    date: '12/09/2025',
     notes: [
         'Reorganizados os botões na tela de PDV para melhor usabilidade.',
         'Adicionado botão "Escanear" com a câmera no PDV.'
     ]
 }, {
-    version: '1.5.9',
+    version: '1.5.0',
     date: '11/09/2025',
     notes: [
         'Adicionado botão [X] para remover itens diretamente do carrinho.',
-        'Melhorada a visualização dos itens no carrinho com mais detalhes.'
-    ]
-}, {
-    version: '1.5.8',
-    date: '11/09/2025',
-    notes: [
+        'Melhorada a visualização dos itens no carrinho com mais detalhes.',
         'Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',
-    ]
-}, {
-    version: '1.5.7',
-    date: '11/09/2025',
-    notes: [
         'Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.',
-        'Melhorada a robustez da função de atualização de clientes.'
-    ]
-}, {
-    version: '1.5.6',
-    date: '11/09/2025',
-    notes: [
-        'Adicionada opção de pagamento "Fiado" no modal de pagamento.'
-    ]
-}, {
-    version: '1.5.5',
-    date: '11/09/2025',
-    notes: [
-        'Corrigido o botão "Diversos" que não estava funcionando corretamente.'
-    ]
-}, {
-    version: '1.5.4',
-    date: '11/09/2025',
-    notes: [
-        'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.'
-    ]
-}, {
-    version: '1.5.3',
-    date: '11/09/2025',
-    notes: [
-        'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.'
-    ]
-}, {
-    version: '1.5.2',
-    date: '11/09/2025',
-    notes: [
-        'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.'
-    ]
-},
-{
-    version: '1.5.1',
-    date: '11/09/2025',
-    notes: [
+        'Melhorada a robustez da função de atualização de clientes.',
+        'Adicionada opção de pagamento "Fiado" no modal de pagamento.',
+        'Corrigido o botão "Diversos" que não estava funcionando corretamente.',
+        'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.',
+        'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.',
+        'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.',
         'Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'
     ]
 },
 {
-    version: '1.5.0',
+    version: '1.4.0',
     date: '10/09/2025',
     notes: [
         'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
@@ -397,14 +374,14 @@ const releaseNotes = [{
     ]
 },
 {
-    version: '1.4.0',
+    version: '1.3.0',
     date: '10/09/2025',
     notes: [
         'Limites de historico de atividades aumentado, de 50 para 300'
     ]
 },
 {
-    version: '1.3.0',
+    version: '1.2.0',
     date: '10/09/2025',
     notes: [
         'Adicionado filtro de data na aba de relatórios.',
@@ -412,7 +389,7 @@ const releaseNotes = [{
     ]
 },
 {
-    version: '1.2.1',
+    version: '1.1.0',
     date: '10/09/2025',
     notes: [
         'Adicionada seção de "Novidades da Versão" ao Painel.',
@@ -421,18 +398,12 @@ const releaseNotes = [{
     ]
 },
 {
-    version: '1.1.0',
+    version: '1.0',
     date: '09/09/2025',
     notes: [
+        'Lançamento inicial do sistema PDV.',
         'Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.',
         'Tradução de mais elementos da interface para Português (Brasil).'
-    ]
-},
-{
-    version: '1.0.0',
-    date: '01/09/2025',
-    notes: [
-        'Lançamento inicial do sistema TopDeLinha PDV.'
     ]
 }
 ];
@@ -640,64 +611,124 @@ window.addPdvProductFromSearch = function (sku) {
 
 function renderInventoryTab() {
     contentInventory.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <div class="mb-8">
-                            <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
-                            <div class="bg-gray-50 p-6 rounded-lg">
-                                <label for="inventory-barcode-input" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
-                                    <button type="button" id="inventory-scan-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
-                                </div>
-                                <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
-                                <input type="text" id="inventory-search-input" onkeyup="handleInventorySearch(event)" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
-                                <div id="inventory-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
-                            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <div class="mb-8">
+                    <h3 class="font-semibold text-xl text-gray-700 mb-4">Entrada Rápida de Estoque</h3>
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <label for="inventory-barcode-input" class="block text-sm font-medium text-gray-700">Escanear Código de Barras</label>
+                        <div class="flex items-center gap-2 mt-1">
+                            <input type="text" id="inventory-barcode-input" placeholder="Use o leitor de código de barras aqui..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                            <button type="button" id="inventory-scan-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap">Escanear</button>
                         </div>
-                        <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-6">Adicionar Novo Produto (Manual)</h3>
-                        <form id="add-product-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
-                            <input type="text" id="new-sku" placeholder="Código Interno (SKU)" required class="w-full p-2 border rounded">
-                            <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
-                            <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
-                            <input type="tel" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
-                            <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
-                            <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
-                            <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
-                        </form>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Visão Geral do Estoque</h3>
-                        <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                            <table class="w-full text-left">
-                                <thead class="bg-gray-100"><tr><th class="p-3 font-semibold text-gray-600">Produto</th><th class="p-3 font-semibold text-gray-600 text-center">Estoque</th></tr></thead>
-                                <tbody id="inventory-management-table-body"></tbody>
-                            </table>
-                        </div>
+                        <p class="text-gray-600 my-4 text-center">Ou procure pelo nome para adicionar estoque:</p>
+                        <input type="text" id="quick-stock-search" placeholder="Buscar produto..." class="w-full p-2 border rounded-md">
+                        <div id="inventory-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
                     </div>
                 </div>
-            `
+                <h3 class="font-semibold text-xl text-gray-700 mb-4 border-t pt-6">Adicionar Novo Produto (Manual)</h3>
+                <form id="add-product-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
+                    <input type="text" id="new-sku" placeholder="Código Interno (SKU)" required class="w-full p-2 border rounded">
+                    <input type="text" id="new-barcode" placeholder="Código de Barras (opcional)" class="w-full p-2 border rounded">
+                    <input type="text" id="new-name" placeholder="Nome do Produto" required class="w-full p-2 border rounded">
+                    <input type="tel" id="new-price" placeholder="Preço (R$)" step="0.01" min="0" required class="w-full p-2 border rounded">
+                    <input type="number" id="new-stock" placeholder="Estoque Inicial" min="0" required class="w-full p-2 border rounded">
+                    <input type="number" id="new-min-stock" placeholder="Estoque Mínimo" min="0" required class="w-full p-2 border rounded">
+                    <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Adicionar Produto</button>
+                </form>
+            </div>
+            <div>
+                <h3 class="font-semibold text-xl text-gray-700 mb-4">Visão Geral do Estoque</h3>
+                <div class="mb-4 flex items-end gap-2">
+                    <div class="flex-grow">
+                        <label for="inventory-search-input" class="block text-sm font-medium text-gray-700">Pesquisar Produto</label>
+                        <input type="text" id="inventory-search-input" placeholder="Nome, SKU ou Cód. de Barras..." class="mt-1 block w-full p-2 border rounded-md">
+                    </div>
+                    <button id="overview-scan-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 h-10 whitespace-nowrap">Escanear</button>
+                    </div>
+                <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                    <table class="w-full text-left">
+                        <tbody id="inventory-management-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
     renderInventoryManagement();
-}
 
-window.handleInventorySearch = function (event) {
-    const searchTerm = event.target.value.toLowerCase();
-    const resultsContainer = document.getElementById('inventory-search-results');
+    const quickSearchInput = document.getElementById('quick-stock-search');
+    const tableSearchInput = document.getElementById('inventory-search-input');
+    const overviewScanButton = document.getElementById('overview-scan-button');
 
-    if (searchTerm.length < 2) {
-        resultsContainer.innerHTML = '';
-        return;
+    // Lógica para o novo botão de escanear na Visão Geral
+    if (overviewScanButton) {
+        overviewScanButton.addEventListener('click', () => {
+            startScanner(onOverviewScanSuccess);
+        });
     }
 
-    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm));
+    // Lógica de pesquisa da tabela (Visão Geral do Estoque)
+    if (tableSearchInput) {
+        tableSearchInput.addEventListener('input', debounce((e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredProducts = products.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) ||
+                p.sku.toLowerCase().includes(searchTerm) ||
+                p.barcode && p.barcode.toLowerCase().includes(searchTerm) // Adiciona a pesquisa por código de barras
+            );
+            renderInventoryManagement(filteredProducts);
+        }, 300));
+    }
 
-    if (filteredProducts.length > 0) {
-        resultsContainer.innerHTML = filteredProducts.map(p => `
+    // Lógica de pesquisa da Entrada Rápida
+    if (quickSearchInput) {
+        quickSearchInput.addEventListener('input', debounce((e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const resultsContainer = document.getElementById('inventory-search-results');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+            const filteredProducts = products.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) || 
+                p.sku.toLowerCase().includes(searchTerm) ||
+                p.barcode && p.barcode.toLowerCase().includes(searchTerm) // Adiciona a pesquisa por código de barras
+            );
+            if (filteredProducts.length > 0) {
+                resultsContainer.innerHTML = filteredProducts.map(p => `
                     <div onclick="addProductStockFromSearch('${p.id}')" class="p-2 border-b hover:bg-gray-100 cursor-pointer">
                         <p class="font-semibold">${p.name}</p>
                         <p class="text-sm text-gray-500">Estoque atual: ${p.stock}</p>
                     </div>
                 `).join('');
+            } else {
+                resultsContainer.innerHTML = '<p class="p-2 text-gray-500">Nenhum produto encontrado.</p>';
+            }
+        }, 300));
+    }
+}
+
+
+window.handleInventorySearch = function (event) {
+    const searchTerm = event.target.value.toLowerCase();
+    const resultsContainer = document.getElementById('inventory-search-results');
+
+    if (searchTerm.length < 1) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm) || p.sku.toLowerCase().includes(searchTerm));
+
+    if (filteredProducts.length > 0) {
+        resultsContainer.innerHTML = filteredProducts.map(p => `
+            <div onclick="addProductStockFromSearch('${p.id}')" class="p-2 border-b hover:bg-gray-100 cursor-pointer">
+                <p class="font-semibold">${p.name}</p>
+                <p class="text-sm text-gray-500">Estoque atual: ${p.stock}</p>
+            </div>
+        `).join('');
     } else {
         resultsContainer.innerHTML = '<p class="p-2 text-gray-500">Nenhum produto encontrado.</p>';
     }
@@ -1391,7 +1422,50 @@ function renderDebtorsList() {
                 </table>
             `;
 }
+// Função para fechar o modal de edição de produto
+window.closeEditProductModal = function () {
+    const editProductModal = document.getElementById('edit-product-modal');
+    if (editProductModal) {
+        editProductModal.classList.add('hidden');
+    }
+}
 
+// Função para abrir o modal de edição de produto e preencher os campos
+window.openEditProductModal = function (productId) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    document.getElementById('edit-product-id').value = product.id;
+    document.getElementById('edit-product-sku').value = product.sku;
+    document.getElementById('edit-product-barcode').value = product.barcode || '';
+    document.getElementById('edit-product-name').value = product.name;
+    document.getElementById('edit-product-price').value = product.price.toFixed(2);
+    document.getElementById('edit-product-stock').value = product.stock;
+    document.getElementById('edit-product-min-stock').value = product.minStock;
+
+    closeEditCustomerModal(); // Fecha o modal de cliente se estiver aberto
+    document.getElementById('edit-product-modal').classList.remove('hidden');
+}
+
+// Função para excluir um produto
+window.handleDeleteProduct = async function (productId) {
+    if (!confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
+        return;
+    }
+
+    try {
+        await deleteDoc(doc(db, "products", productId));
+        await logActivity('PRODUTO_EXCLUIDO', { productId }, currentShift ? currentShift.openedBy : 'Sistema');
+        showModal('Sucesso', 'Produto excluído com sucesso.');
+        await loadInitialData();
+        renderAll();
+    } catch (error) {
+        console.error("Erro ao excluir produto:", error);
+        showModal('Erro', 'Não foi possível excluir o produto. Tente novamente.');
+    }
+}
+
+// --- MODAIS DE CLIENTES E FIADO ---
 window.openDebtPaymentModal = function (customerId) {
     if (!currentShift) {
         showModal('Caixa Fechado', 'É necessário abrir um turno para receber pagamentos de dívidas.');
@@ -1469,6 +1543,56 @@ window.openEditCustomerModal = function (customerId) {
 
 window.closeEditCustomerModal = function () {
     editCustomerModal.classList.add('hidden');
+}
+
+// Função para atualizar os dados do produto
+async function handleUpdateProduct(event) {
+    event.preventDefault();
+    const productId = document.getElementById('edit-product-id').value;
+    if (!productId) {
+        showModal('Erro', 'ID do produto não encontrado.');
+        return;
+    }
+
+    const productRef = doc(db, "products", productId);
+    const updatedName = document.getElementById('edit-product-name').value.trim();
+    const updatedBarcode = document.getElementById('edit-product-barcode').value.trim();
+    const updatedPrice = parseCurrency(document.getElementById('edit-product-price').value);
+    const updatedStock = parseInt(document.getElementById('edit-product-stock').value);
+    const updatedMinStock = parseInt(document.getElementById('edit-product-min-stock').value);
+
+    // Validação de campos
+    if (!updatedName || isNaN(updatedPrice) || isNaN(updatedStock) || isNaN(updatedMinStock)) {
+        showModal('Erro', 'Preencha todos os campos obrigatórios com valores válidos.');
+        return;
+    }
+
+    // Validação do código de barras
+    if (updatedBarcode !== '') {
+        const validLengths = [8, 12, 13];
+        if (!/^\d+$/.test(updatedBarcode) || !validLengths.includes(updatedBarcode.length)) {
+            showModal('Erro de Código de Barras', 'O código de barras deve conter apenas números e ter 8, 12 ou 13 dígitos.');
+            return;
+        }
+    }
+
+    try {
+        await updateDoc(productRef, {
+            name: updatedName,
+            barcode: updatedBarcode,
+            price: updatedPrice,
+            stock: updatedStock,
+            minStock: updatedMinStock
+        });
+        await logActivity('PRODUTO_ATUALIZADO', { productId, name: updatedName }, currentShift ? currentShift.openedBy : 'Sistema');
+        showModal('Sucesso', 'Produto atualizado com sucesso.');
+        closeEditProductModal();
+        await loadInitialData();
+        renderAll();
+    } catch (error) {
+        console.error("Erro ao atualizar produto:", error);
+        showModal('Erro', 'Não foi possível salvar as alterações do produto. Tente novamente.');
+    }
 }
 
 async function handleUpdateCustomer() {
@@ -1765,7 +1889,7 @@ function handleDiversosItemClick(e) {
         const itemName = e.target.dataset.item;
         const priceStr = prompt(`Digite o valor para "${itemName}":`);
         const price = parseCurrency(priceStr);
-        
+
         if (!isNaN(price) && price > 0) {
             addDiversosToCart(itemName, price);
         } else if (priceStr !== null) {
@@ -1833,7 +1957,7 @@ async function confirmSale() {
                 saleInProgress.payments = payments.filter(p => p.amount !== 0);
             }
         }
-        
+
         // RESTANTE DA LÓGICA COMUM A AMBOS OS CENÁRIOS
         const activeShift = currentDay.shifts.find(s => !s.endTime);
         if (!activeShift) {
@@ -1996,12 +2120,19 @@ function renderProductList() {
     });
 }
 
-function renderInventoryManagement() {
+function renderInventoryManagement(productsToRender = products) {
+    console.log('Produtos a renderizar:', productsToRender);
     const inventoryManagementTableBodyEl = document.getElementById('inventory-management-table-body');
     if (!inventoryManagementTableBodyEl) return;
-    inventoryManagementTableBodyEl.innerHTML = '';
+    
+    if (productsToRender.length === 0) {
+        inventoryManagementTableBodyEl.innerHTML = `
+            <p class="p-4 text-center text-gray-500">Nenhum produto encontrado.</p>
+        `;
+        return;
+    }
 
-    const sortedProducts = [...products].sort((a, b) => {
+    const sortedProducts = [...productsToRender].sort((a, b) => {
         const aIsLow = a.stock <= a.minStock;
         const bIsLow = b.stock <= b.minStock;
         if (aIsLow && !bIsLow) return -1;
@@ -2009,18 +2140,37 @@ function renderInventoryManagement() {
         return a.name.localeCompare(b.name);
     });
 
-    sortedProducts.forEach(product => {
-        const isLowStock = product.stock <= product.minStock;
-        const rowClass = isLowStock ? 'bg-red-50' : '';
-        const textClass = isLowStock ? 'text-red-600 font-bold' : '';
-
-        inventoryManagementTableBodyEl.innerHTML += `
+    inventoryManagementTableBodyEl.innerHTML = `
+        <thead class="bg-gray-100">
+            <tr>
+                <th class="p-3 font-semibold text-gray-600">Produto</th>
+                <th class="p-3 font-semibold text-gray-600 text-center">Estoque</th>
+                <th class="p-3 font-semibold text-gray-600 text-center">Preço</th>
+                <th class="p-3 font-semibold text-gray-600 text-center">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${sortedProducts.map(product => {
+                const isLowStock = product.stock <= product.minStock;
+                const rowClass = isLowStock ? 'bg-red-50' : '';
+                const textClass = isLowStock ? 'text-red-600 font-bold' : '';
+                return `
                     <tr class="${rowClass}">
-                        <td class="p-3">${product.name}</td>
+                        <td class="p-3">
+                            <p class="font-semibold">${product.name}</p>
+                            <p class="text-xs text-gray-500">SKU: ${product.sku} | Cód. Barras: ${product.barcode || 'N/A'}</p>
+                        </td>
                         <td class="p-3 text-center ${textClass}">${product.stock}</td>
+                        <td class="p-3 text-center">${formatCurrency(product.price)}</td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="openEditProductModal('${product.id}')" class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-indigo-200">Editar</button>
+                            <button onclick="handleDeleteProduct('${product.id}')" class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-200">Excluir</button>
+                        </td>
                     </tr>
                 `;
-    });
+            }).join('')}
+        </tbody>
+    `;
 }
 
 async function handleAddProduct(event) {
@@ -2139,6 +2289,17 @@ Deseja cadastrá-lo agora?`)) {
 
 // --- BARCODE SCANNER LOGIC ---
 
+// Callback específico para a pesquisa na Visão Geral do Estoque
+// Callback específico para a pesquisa na Visão Geral do Estoque
+function onOverviewScanSuccess(decodedText) {
+    const product = products.find(p => p.barcode === decodedText);
+    if (product) {
+        showEditOrDeleteModal(product);
+    } else {
+        showModal('Produto Não Encontrado', `Nenhum produto com o código de barras "${decodedText}" foi encontrado no estoque.`);
+    }
+}
+
 const scannerModal = document.getElementById('scanner-modal');
 
 // Function to be called on successful scan
@@ -2225,6 +2386,7 @@ document.addEventListener('DOMContentLoaded', () => {
     forgotPasswordLink.addEventListener('click', handleForgotPassword);
     addPaymentForm.addEventListener('submit', handleAddPayment);
     confirmSaleButton.addEventListener('click', confirmSale);
+    document.getElementById('update-product-button')?.addEventListener('click', handleUpdateProduct);
 
     document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
     document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
@@ -2251,6 +2413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'barcode-input-field') handleBarcodeKeypress(e);
     });
 
+    // AQUI ESTÁ O CÓDIGO CORRETO PARA A ABA DE ESTOQUE
     contentInventory.addEventListener('submit', function (e) {
         if (e.target.id === 'add-product-form') handleAddProduct(e);
     });
@@ -2266,6 +2429,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.value = '';
         }
     });
+    // FIM DO CÓDIGO CORRIGIDO
 
     contentCustomers.addEventListener('submit', function (e) {
         if (e.target.id === 'add-customer-form') handleAddCustomer(e);
@@ -2296,7 +2460,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2).replace('.', ',');
             }
         }
-    });
+});});
 
+//
+// NEW: Função para mostrar o modal de escolha Editar/Excluir
+function showEditOrDeleteModal(product) {
+    const modal = document.getElementById('edit-or-delete-modal');
+    document.getElementById('edit-or-delete-modal-message').textContent = `O que deseja fazer com ${product.name}?`;
+    
+    // Conecta os botões do modal às funções de edição e exclusão
+    const editButton = document.getElementById('edit-product-choice-button');
+    const deleteButton = document.getElementById('delete-product-choice-button');
+    
+    // Para evitar eventos duplicados, removemos os antigos antes de adicionar os novos
+    editButton.onclick = null;
+    deleteButton.onclick = null;
+    
+    editButton.onclick = () => {
+        closeModalById('edit-or-delete-modal');
+        openEditProductModal(product.id);
+    };
+    
+    deleteButton.onclick = () => {
+        closeModalById('edit-or-delete-modal');
+        handleDeleteProduct(product.id);
+    };
+    
+    modal.classList.remove('hidden');
+}
 
-});
+// NEW: Função auxiliar para fechar qualquer modal por ID
+window.closeModalById = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.add('hidden');
+};
