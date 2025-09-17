@@ -372,9 +372,31 @@
             <h3 class="text-xl font-bold text-gray-900">Produto Encontrado!</h3>
             <p id="edit-or-delete-modal-message" class="mt-2 text-sm text-gray-500"></p>
         </div>
-        <div class="p-6 flex justify-around">
+        <div class="p-6 flex justLOify-around">
             <button id="edit-product-choice-button" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700">Editar</button>
             <button id="delete-product-choice-button" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Excluir</button>
+        </div>
+    </div>
+</div>
+
+<div id="debt-statement-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+        <div class="p-6 border-b">
+            <h3 class="text-2xl font-bold text-gray-900">Extrato do Cliente</h3>
+        </div>
+        <div class="p-6">
+            <div class="mb-4">
+                <p class="text-lg">Cliente: <span id="statement-customer-name" class="font-semibold"></span></p>
+                <p class="text-lg">Saldo Devedor Atual: <span id="statement-customer-debt" class="font-semibold text-red-600"></span></p>
+            </div>
+            <div class="border-t pt-4">
+                <h4 class="font-semibold mb-2">Histórico de Transações</h4>
+                <div id="statement-transactions-list" class="max-h-64 overflow-y-auto space-y-2">
+                    </div>
+            </div>
+        </div>
+        <div class="bg-gray-100 p-4 flex justify-end">
+            <button onclick="closeDebtStatementModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
         </div>
     </div>
 </div>
@@ -415,6 +437,89 @@
             <div class="bg-gray-100 p-4 flex justify-end space-x-2">
                 <button type="button" onclick="closeEditProductModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
                 <button type="submit" id="update-product-button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="quick-receipt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-900">Recebimento Rápido</h3>
+            <button onclick="closeQuickReceiptModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+        </div>
+        <div class="p-6">
+             <div class="mb-4">
+                <label for="modal-receipts-customer-search" class="block text-sm font-medium text-gray-700">1. Pesquisar Cliente por Nome</label>
+                <input type="text" id="modal-receipts-customer-search" placeholder="Digite o nome do cliente com dívida..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                <div id="modal-receipts-search-results" class="mt-2 max-h-48 overflow-y-auto border rounded-md"></div>
+            </div>
+            <div id="modal-receipts-payment-area" class="hidden mt-8">
+                <h4 class="text-lg font-semibold text-gray-700">2. Detalhes do Pagamento</h4>
+                <div class="my-4 p-4 bg-gray-50 rounded-md border">
+                    <p>Cliente: <span id="modal-receipts-customer-name" class="font-bold text-lg"></span></p>
+                    <p>Dívida Atual: <span id="modal-receipts-current-debt" class="font-bold text-lg text-red-600"></span></p>
+                </div>
+                <form id="modal-quick-receipt-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="modal-receipts-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
+                        <input type="tel" id="modal-receipts-payment-amount" class="mt-1 block w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="modal-receipts-payment-method" class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+                        <select id="modal-receipts-payment-method" class="mt-1 block w-full p-2 border rounded-md">
+                            <option>Dinheiro</option>
+                            <option>Pix</option>
+                            <option>Cartão de Crédito</option>
+                            <option>Cartão de Débito</option>
+                        </select>
+                    </div>
+                </form>
+                 <div class="mt-6 flex gap-4">
+                    <button id="modal-receipts-pay-full-debt-button" type="button" class="w-full bg-blue-100 text-blue-800 font-bold py-2 rounded-lg hover:bg-blue-200">Pagar Valor Total</button>
+                    <button id="modal-receipts-confirm-payment-button" type="button" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">Confirmar Recebimento</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="add-customer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+         <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-900">Adicionar Novo Cliente</h3>
+            <button onclick="closeAddCustomerModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+        </div>
+        <form id="modal-add-customer-form" class="p-6 space-y-4">
+            <input type="text" id="modal-new-customer-name" placeholder="Nome Completo" required class="w-full p-2 border rounded">
+            <input type="text" id="modal-new-customer-phone" placeholder="Telefone (opcional)" class="w-full p-2 border rounded">
+            <div class="bg-gray-100 p-4 flex justify-end">
+                 <button onclick="closeAddCustomerModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                 <button type="submit" class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar Cliente</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="manual-debt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-900">Adicionar Dívida Manual</h3>
+            <button onclick="closeManualDebtModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+        </div>
+        <form id="manual-debt-form" class="p-6 space-y-4">
+            <input type="hidden" id="manual-debt-customer-id">
+            <p>Cliente: <span id="manual-debt-customer-name" class="font-semibold"></span></p>
+            <div>
+                <label for="manual-debt-amount" class="block text-sm font-medium text-gray-700">Valor da Dívida (R$)</label>
+                <input type="tel" id="manual-debt-amount" required class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label for="manual-debt-description" class="block text-sm font-medium text-gray-700">Descrição (Opcional)</label>
+                <input type="text" id="manual-debt-description" placeholder="Ex: Dívida antiga, Vale" class="mt-1 block w-full p-2 border rounded-md">
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end gap-2">
+                <button type="button" onclick="closeManualDebtModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                <button type="submit" class="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Adicionar Dívida</button>
             </div>
         </form>
     </div>

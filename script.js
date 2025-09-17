@@ -35,8 +35,11 @@ let currentShift = null;
 let saleInProgress = {};
 let selectedPaymentMethod = 'Dinheiro';
 let salesChart = null;
-let settings = {}; // NEW: To store settings
+let settings = {};
 let html5QrcodeScanner = null;
+let selectedCustomerForPayment = null;
+let areDebtsVisible = true; // Controla a visibilidade dos valores de dívida
+
 
 // --- ELEMENTOS DO DOM ---
 const loginScreen = document.getElementById('login-screen');
@@ -61,6 +64,7 @@ const debtPaymentModal = document.getElementById('debt-payment-modal');
 const receiptModal = document.getElementById('receipt-modal');
 const diversosModal = document.getElementById('diversos-modal');
 
+
 // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
 function debounce(func, delay = 400) {
     let timeout;
@@ -69,17 +73,40 @@ function debounce(func, delay = 400) {
         timeout = setTimeout(() => { func.apply(this, args); }, delay);
     };
 }
-export const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-// Função para converter string monetária (pt-BR) para número
+export const formatCurrency = (value) => {
+    // Garante que o valor é um número antes de formatar
+    if (typeof value !== 'number') {
+        value = Number(value) || 0;
+    }
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
 export const parseCurrency = (value) => {
-    if (typeof value !== 'string') return Number(value) || 0;
-    // Remove símbolo R$, espaços e tudo que não é número, ponto ou vírgula
-    let cleaned = value.replace(/R\$|\s/g, '');
-    // Remove pontos (milhar), troca vírgula por ponto (decimal)
-    cleaned = cleaned.replace(/\./g, '').replace(/,/g, '.');
-    // Se sobrar só vírgula, trata como zero
-    if (cleaned === '' || cleaned === ',') return 0;
+    if (typeof value !== 'string') {
+        return Number(value) || 0;
+    }
+
+    // Remove tudo exceto dígitos, pontos e vírgulas
+    let cleaned = value.replace(/[^0-9.,]/g, '');
+
+    // Verifica qual é o último separador: ponto ou vírgula
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+
+    // Se a vírgula for o último separador (formato pt-BR: 1.234,56)
+    if (lastComma > lastDot) {
+        // Remove os pontos (milhares) e troca a vírgula (decimal) por ponto
+        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    // Se o ponto for o último separador (formato US: 1,234.56) ou se não houver vírgula
+    else if (lastDot > lastComma) {
+        // Apenas remove as vírgulas (milhares)
+        cleaned = cleaned.replace(/,/g, '');
+    }
+    // Se não houver separadores, não faz nada.
+
     return parseFloat(cleaned) || 0;
+
+
 };
 const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -305,121 +332,154 @@ async function logActivity(type, details, user = 'Sistema') {
 
 // --- RENDERIZAÇÃO ESPECÍFICA DE CADA ABA ---
 
-const releaseNotes = [{
+const releaseNotes = [
 
-    version: '1.8.0',
-    date: '15/09/2025',
-    notes: [
-        'Adicionado escaneamento de código de barras com a câmera na aba de Estoque (Visão Geral e Entrada Rápida).',
-        'Melhoria na pesquisa de produtos na aba de Estoque, agora é possível buscar por código de barras além do nome e SKU.',
-        'Correção de bug na validação do código de barras ao adicionar novo produto.',
-        'Adicionado função de de editar produto diretamente na tabela de estoque.',
-        'Adicionado função de deletar produto diretamente na tabela de estoque.',
-        'Adicionado confirmação ao deletar produto.',
-        'Melhoria na usabilidade do scanner de código de barras, com foco automático no campo de entrada após cada escaneamento.',
-        'tradução de mais elementos da interface para Português (Brasil).',
-        'Melhoria na performance geral do sistema.',
-        'Correção de bugs menores e melhorias na interface.',
-        'Adicionado o valor do produto na aba de estoque (Visão Geral).' 
+    {
+        version: '1.9.0',
+        date: '16/09/2025', // <-- Pode ajustar para a data de hoje
+        notes: [
+            'Reformulação completa da aba "Clientes" com um design mais limpo e profissional.',
+            'Funcionalidades "Adicionar Cliente" e "Recebimento Rápido" foram movidas para janelas (modais) dedicadas para uma melhor experiência de uso (UI/UX).',
+            'Implementada barra de pesquisa em tempo real na lista de clientes, permitindo filtrar por nome ou telefone.',
+            'Adicionado botão de "olho" (👁️) para mostrar/ocultar todos os valores de dívida na aba Clientes, garantindo maior privacidade.',
+            'O extrato do cliente agora mostra os itens detalhados de cada venda a fiado, e não apenas o valor total.',
+            'Adicionado botão "+" para registar dívidas manuais a um cliente (ex: dívidas antigas), com registo no histórico.',
+            'O recebimento de dívidas (tanto o rápido como o manual da lista) agora calcula o troco para pagamentos em excesso.',
+            'Abertura automática da gaveta foi integrada ao receber pagamentos de dívidas em dinheiro.',
+            'Geração de um "Comprovativo de Pagamento" específico para dívidas, separado do recibo de venda.',
+            'Correção de bug crítico que fazia a página recarregar ao pressionar a tecla "Enter" em certos campos.'
+        ]
+    }, {
 
-    ]
-}, {
-    version: '1.7.0',
-    date: '14/09/2025',
-    notes: [
-        'Melhoria de adicionar item ao estoque',
-        'Agora o sistema permite adicionar itens ao estoque através da busca por nome, facilitando a reposição rápida de produtos.',
-        'Somente codigo de barras com (8,12,13 ou sem codigo de barras) digitos são aceitos',
-        'Validação de SKU, Nome e Código de Barras duplicado ao adicionar novo produto.',
-        'Correção de bug na validação do código de barras ao adicionar novo produto.'
+        version: '1.8.0',
+        date: '15/09/2025',
+        notes: [
+            'Adicionado escaneamento de código de barras com a câmera na aba de Estoque (Visão Geral e Entrada Rápida).',
+            'Melhoria na pesquisa de produtos na aba de Estoque, agora é possível buscar por código de barras além do nome e SKU.',
+            'Correção de bug na validação do código de barras ao adicionar novo produto.',
+            'Adicionado função de de editar produto diretamente na tabela de estoque.',
+            'Adicionado função de deletar produto diretamente na tabela de estoque.',
+            'Adicionado confirmação ao deletar produto.',
+            'Melhoria na usabilidade do scanner de código de barras, com foco automático no campo de entrada após cada escaneamento.',
+            'tradução de mais elementos da interface para Português (Brasil).',
+            'Melhoria na performance geral do sistema.',
+            'Correção de bugs menores e melhorias na interface.',
+            'Adicionado o valor do produto na aba de estoque (Visão Geral).'
 
-    ]
-}, {
+        ]
+    }, {
+        version: '1.7.0',
+        date: '14/09/2025',
+        notes: [
+            'Melhoria de adicionar item ao estoque',
+            'Agora o sistema permite adicionar itens ao estoque através da busca por nome, facilitando a reposição rápida de produtos.',
+            'Somente codigo de barras com (8,12,13 ou sem codigo de barras) digitos são aceitos',
+            'Validação de SKU, Nome e Código de Barras duplicado ao adicionar novo produto.',
+            'Correção de bug na validação do código de barras ao adicionar novo produto.'
 
-    version: '1.6.1',
-    date: '13/09/2025',
-    notes: [
-        'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
-    ]
-}, {
-    version: '1.6.0',
-    date: '12/09/2025',
-    notes: [
-        'Reorganizados os botões na tela de PDV para melhor usabilidade.',
-        'Adicionado botão "Escanear" com a câmera no PDV.'
-    ]
-}, {
-    version: '1.5.0',
-    date: '11/09/2025',
-    notes: [
-        'Adicionado botão [X] para remover itens diretamente do carrinho.',
-        'Melhorada a visualização dos itens no carrinho com mais detalhes.',
-        'Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',
-        'Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.',
-        'Melhorada a robustez da função de atualização de clientes.',
-        'Adicionada opção de pagamento "Fiado" no modal de pagamento.',
-        'Corrigido o botão "Diversos" que não estava funcionando corretamente.',
-        'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.',
-        'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.',
-        'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.',
-        'Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'
-    ]
-},
-{
-    version: '1.4.0',
-    date: '10/09/2025',
-    notes: [
-        'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
-        'Implementada leitura de códigos de barra de balança (iniciados com \'2\') para extrair SKU e preço.'
-    ]
-},
-{
-    version: '1.3.0',
-    date: '10/09/2025',
-    notes: [
-        'Limites de historico de atividades aumentado, de 50 para 300'
-    ]
-},
-{
-    version: '1.2.0',
-    date: '10/09/2025',
-    notes: [
-        'Adicionado filtro de data na aba de relatórios.',
-        'Alterada a ordem de exibição do log de atividades para mostrar os itens mais recentes primeiro.'
-    ]
-},
-{
-    version: '1.1.0',
-    date: '10/09/2025',
-    notes: [
-        'Adicionada seção de "Novidades da Versão" ao Painel.',
-        'Corrigido o alerta de estoque baixo no painel para usar o valor mínimo definido por produto.',
-        'Adicionado aviso de estoque mínimo no recibo após a venda.'
-    ]
-},
-{
-    version: '1.0',
-    date: '09/09/2025',
-    notes: [
-        'Lançamento inicial do sistema PDV.',
-        'Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.',
-        'Tradução de mais elementos da interface para Português (Brasil).'
-    ]
-}
+        ]
+    }, {
+
+        version: '1.6.1',
+        date: '13/09/2025',
+        notes: [
+            'Corrigido bug que impedia o botão "Confirmar Venda" de ser habilitado quando o valor pago era exatamente igual ao total, devido a problemas de arredondamento.'
+        ]
+    }, {
+        version: '1.6.0',
+        date: '12/09/2025',
+        notes: [
+            'Reorganizados os botões na tela de PDV para melhor usabilidade.',
+            'Adicionado botão "Escanear" com a câmera no PDV.'
+        ]
+    }, {
+        version: '1.5.0',
+        date: '11/09/2025',
+        notes: [
+            'Adicionado botão [X] para remover itens diretamente do carrinho.',
+            'Melhorada a visualização dos itens no carrinho com mais detalhes.',
+            'Corrigido bug crítico na venda a fiado que impedia a finalização da venda.',
+            'Corrigido um bug que poderia ocorrer ao tentar atualizar um cliente sem um ID válido.',
+            'Melhorada a robustez da função de atualização de clientes.',
+            'Adicionada opção de pagamento "Fiado" no modal de pagamento.',
+            'Corrigido o botão "Diversos" que não estava funcionando corretamente.',
+            'Adicionado botão "Diversos" no PDV para adicionar itens não cadastrados com valor customizado.',
+            'Corrigido o botão "Cancelar Venda" que não estava funcionando corretamente.',
+            'Adicionada validação para o campo de código de barras, exigindo 13 dígitos para o padrão EAN-13, além de verificar se contém apenas números.',
+            'Adicionada validação para o campo de código de barras ao adicionar um novo produto, garantindo que contenha apenas números ou seja deixado em branco.'
+        ]
+    },
+    {
+        version: '1.4.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionada opção de pesquisa de produto por nome na aba Frente de Caixa (PDV).',
+            'Implementada leitura de códigos de barra de balança (iniciados com \'2\') para extrair SKU e preço.'
+        ]
+    },
+    {
+        version: '1.3.0',
+        date: '10/09/2025',
+        notes: [
+            'Limites de historico de atividades aumentado, de 50 para 300'
+        ]
+    },
+    {
+        version: '1.2.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionado filtro de data na aba de relatórios.',
+            'Alterada a ordem de exibição do log de atividades para mostrar os itens mais recentes primeiro.'
+        ]
+    },
+    {
+        version: '1.1.0',
+        date: '10/09/2025',
+        notes: [
+            'Adicionada seção de "Novidades da Versão" ao Painel.',
+            'Corrigido o alerta de estoque baixo no painel para usar o valor mínimo definido por produto.',
+            'Adicionado aviso de estoque mínimo no recibo após a venda.'
+        ]
+    },
+    {
+        version: '1.0',
+        date: '09/09/2025',
+        notes: [
+            'Lançamento inicial do sistema PDV.',
+            'Implementado scanner de código de barras com a câmera, com preferência para a câmera traseira.',
+            'Tradução de mais elementos da interface para Português (Brasil).'
+        ]
+    }
 ];
 
 function renderReleaseNotes() {
     const container = document.getElementById('release-notes-container');
     if (!container) return;
 
-    container.innerHTML = releaseNotes.map(release => `
-        <div class="bg-white p-4 rounded-lg shadow-sm border">
-            <h4 class="font-bold text-lg">Versão ${release.version} <span class="text-sm font-normal text-gray-500">- ${release.date}</span></h4>
-            <ul class="list-disc list-inside mt-2 space-y-1 text-gray-700">
-                ${release.notes.map(note => `<li>${note}</li>`).join('')}
-            </ul>
-        </div>
-    `).join('');
+    container.innerHTML = releaseNotes.map((release, index) => {
+        const isLatest = index === 0;
+
+        const cardClasses = isLatest 
+            ? 'bg-blue-50 border-blue-200' // Usando a cor azul que sugerimos
+            : 'bg-white border-gray-200';
+        
+        const newBadge = isLatest 
+            ? '<span class="ml-2 text-xs font-semibold text-white bg-blue-500 px-2 py-1 rounded-full align-middle">Mais Recente</span>'
+            : '';
+
+        return `
+            <div class="p-4 rounded-lg shadow-sm border ${cardClasses} transition duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer">
+                <h4 class="font-bold text-lg text-gray-800">
+                    Versão ${release.version} 
+                    <span class="text-sm font-normal text-gray-500">- ${release.date}</span>
+                    ${newBadge}
+                </h4>
+                <ul class="list-disc list-inside mt-2 space-y-1 text-gray-700">
+                    ${release.notes.map(note => `<li>${note}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }).join('');
 }
 
 function renderDashboardTab() {
@@ -672,7 +732,7 @@ function renderInventoryTab() {
     if (tableSearchInput) {
         tableSearchInput.addEventListener('input', debounce((e) => {
             const searchTerm = e.target.value.toLowerCase();
-            const filteredProducts = products.filter(p => 
+            const filteredProducts = products.filter(p =>
                 p.name.toLowerCase().includes(searchTerm) ||
                 p.sku.toLowerCase().includes(searchTerm) ||
                 p.barcode && p.barcode.toLowerCase().includes(searchTerm) // Adiciona a pesquisa por código de barras
@@ -686,13 +746,13 @@ function renderInventoryTab() {
         quickSearchInput.addEventListener('input', debounce((e) => {
             const searchTerm = e.target.value.toLowerCase();
             const resultsContainer = document.getElementById('inventory-search-results');
-            
+
             if (searchTerm.length < 2) {
                 resultsContainer.innerHTML = '';
                 return;
             }
-            const filteredProducts = products.filter(p => 
-                p.name.toLowerCase().includes(searchTerm) || 
+            const filteredProducts = products.filter(p =>
+                p.name.toLowerCase().includes(searchTerm) ||
                 p.sku.toLowerCase().includes(searchTerm) ||
                 p.barcode && p.barcode.toLowerCase().includes(searchTerm) // Adiciona a pesquisa por código de barras
             );
@@ -754,33 +814,12 @@ Qual a quantidade a adicionar?`);
     document.getElementById('inventory-search-results').innerHTML = '';
 }
 
-function renderCustomersTab() {
-    contentCustomers.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h3 class="font-semibold text-xl text-gray-700 mb-4">Adicionar Novo Cliente</h3>
-                        <form id="add-customer-form" class="space-y-4 bg-gray-50 p-6 rounded-lg">
-                            <input type="text" id="new-customer-name" placeholder="Nome Completo" required class="w-full p-2 border rounded">
-                            <input type="text" id="new-customer-phone" placeholder="Telefone (opcional)" class="w-full p-2 border rounded">
-                            <input type="number" id="new-customer-debt" placeholder="Dívida Inicial (R$)" step="0.01" min="0" class="w-full p-2 border rounded">
-                            <button type="submit" class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar Cliente</button>
-                        </form>
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-semibold text-xl text-gray-700">Contas a Receber</h3>
-                            <div class="text-right">
-                                <p class="text-sm text-gray-500">Total em Dívidas</p>
-                                <p id="total-debt-summary" class="font-bold text-lg text-red-600"></p>
-                            </div>
-                        </div>
-                        <div id="debtors-list" class="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                        </div>
-                    </div>
-                </div>
-            `;
-    renderDebtorsList();
-}
+
+// --- NOVAS FUNÇÕES DE CONTROLO DOS MODAIS DE CLIENTES ---
+
+
+
+
 
 function renderReportsTab() {
     contentReports.innerHTML = `
@@ -1359,69 +1398,116 @@ async function handleCloseDay() {
 }
 
 // --- LÓGICA DE CLIENTES E FIADO ---
-async function handleAddCustomer(event) {
-    event.preventDefault();
-    if (!auth.currentUser) return;
 
-    const name = document.getElementById('new-customer-name').value.trim();
-    const phone = document.getElementById('new-customer-phone').value.trim();
-    const debt = parseFloat(document.getElementById('new-customer-debt').value) || 0;
-    if (!name) {
-        showModal('Erro', 'O nome do cliente é obrigatório.');
-        return;
-    }
-    const newCustomer = { name, phone, debt, usuarioId: auth.currentUser.uid };
-    try {
-        const docRef = await addDoc(collection(db, "customers"), newCustomer);
-        await logActivity('CLIENTE_ADICIONADO', { customerId: docRef.id, name, phone }, currentShift ? currentShift.openedBy : 'Sistema');
-        await loadInitialData();
-        renderDebtorsList();
-        document.getElementById('add-customer-form').reset();
-        showModal('Sucesso!', 'Novo cliente cadastrado.');
-    } catch (error) {
-        console.error("Erro ao adicionar cliente:", error);
-        showModal('Erro de Base de Dados', 'Não foi possível guardar o cliente.');
-    }
-}
+// Substitua a sua função renderDebtorsList por esta
 
-function renderDebtorsList() {
+function renderDebtorsList(customersToRender = customers) { // Aceita uma lista, ou usa a global como padrão
     const debtorsListEl = document.getElementById('debtors-list');
     if (!debtorsListEl) return;
 
-    const debtors = customers.filter(c => c.id !== '1'); // Exclui o cliente padrão
-    const totalDebt = debtors.reduce((sum, c) => sum + (c.debt || 0), 0);
-    document.getElementById('total-debt-summary').textContent = formatCurrency(totalDebt);
+    // O debtors agora é a lista que recebemos para renderizar
+    const debtors = customersToRender.filter(c => c.id !== '1');
+    const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0); // O total geral não muda
+
+    document.getElementById('total-debt-summary').textContent = areDebtsVisible ? formatCurrency(totalDebt) : 'R$ •••,••';
 
     if (debtors.length === 0) {
-        debtorsListEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum cliente cadastrado.</p>';
+        debtorsListEl.innerHTML = '<p class="text-gray-500 text-center p-4">Nenhum cliente encontrado.</p>';
+    } else {
+        debtorsListEl.innerHTML = `
+            <table class="w-full text-left">
+                <thead class="bg-gray-100"><tr>
+                    <th class="p-3 font-semibold text-gray-600">Nome</th>
+                    <th class="p-3 font-semibold text-gray-600">Dívida</th>
+                    <th class="p-3 font-semibold text-gray-600 text-center">Ações</th>
+                </tr></thead>
+                <tbody>
+                    ${debtors.map(c => `
+                        <tr class="border-b">
+                            <td class="p-3">
+                                <p class="font-semibold">${c.name}</p>
+                                <p class="text-xs text-gray-500">${c.phone || ''}</p>
+                            </td>
+                            <td class="p-3 font-bold ${c.debt > 0 ? 'text-red-600' : 'text-green-600'}">
+                                ${areDebtsVisible ? formatCurrency(c.debt || 0) : 'R$ •••,••'}
+                            </td>
+                            <td class="p-3 text-center space-x-2">
+                                <button onclick="openManualDebtModal('${c.id}')" class="bg-orange-100 text-orange-800 text-xs font-bold w-7 h-7 rounded-full hover:bg-orange-200" title="Adicionar Dívida Manual">+</button>
+                                <button onclick="openDebtStatementModal('${c.id}')" class="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-blue-200">Extrato</button>
+                                <button onclick="openDebtPaymentModal('${c.id}')" class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200">Receber</button>
+                                <button onclick="openEditCustomerModal('${c.id}')" class="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-gray-200">Editar</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+    renderDebtVisibilityToggle();
+}
+// --- FUNÇÕES PARA ADICIONAR DÍVIDA MANUAL ---
+
+function openManualDebtModal(customerId) {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    document.getElementById('manual-debt-customer-id').value = customer.id;
+    document.getElementById('manual-debt-customer-name').textContent = customer.name;
+    document.getElementById('manual-debt-modal').classList.remove('hidden');
+    document.getElementById('manual-debt-amount').focus();
+}
+
+function closeManualDebtModal() {
+    document.getElementById('manual-debt-modal').classList.add('hidden');
+    document.getElementById('manual-debt-form').reset();
+}
+
+async function handleAddManualDebt(event) {
+    event.preventDefault();
+    const customerId = document.getElementById('manual-debt-customer-id').value;
+    const amount = parseCurrency(document.getElementById('manual-debt-amount').value);
+    const description = document.getElementById('manual-debt-description').value.trim();
+
+    if (isNaN(amount) || amount <= 0) {
+        showModal('Erro', 'Por favor, insira um valor de dívida válido.');
         return;
     }
 
-    debtorsListEl.innerHTML = `
-                <table class="w-full text-left">
-                    <thead class="bg-gray-100"><tr>
-                        <th class="p-3 font-semibold text-gray-600">Nome</th>
-                        <th class="p-3 font-semibold text-gray-600">Dívida</th>
-                        <th class="p-3 font-semibold text-gray-600 text-center">Ações</th>
-                    </tr></thead>
-                    <tbody>
-                        ${debtors.map(c => `
-                            <tr class="border-b">
-                                <td class="p-3">
-                                    <p class="font-semibold">${c.name}</p>
-                                    <p class="text-xs text-gray-500">${c.phone || ''}</p>
-                                </td>
-                                <td class="p-3 font-bold ${c.debt > 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(c.debt || 0)}</td>
-                                <td class="p-3 text-center space-x-2">
-                                    <button onclick="openDebtPaymentModal('${c.id}')" class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-200">Receber</button>
-                                    <button onclick="openEditCustomerModal('${c.id}')" class="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-gray-200">Editar</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    const newDebt = parseFloat((customer.debt + amount).toFixed(2));
+
+    try {
+        const customerRef = doc(db, "customers", customerId);
+        await updateDoc(customerRef, { debt: newDebt });
+        customer.debt = newDebt; // Atualiza localmente
+
+        // Usamos a 'addDebtTransaction' existente, passando o tipo 'sale' para representar um débito
+        // e a descrição para o log principal.
+        await addDebtTransaction(customerId, 'sale', amount, null, description); // Adicionamos a descrição aqui
+        await logActivity('DIVIDA_MANUAL', {
+            customerName: customer.name,
+            amount: amount,
+            description: description || 'Nenhuma'
+        }, currentShift ? currentShift.openedBy : 'Sistema');
+
+        closeManualDebtModal();
+        showModal('Sucesso', `Dívida de ${formatCurrency(amount)} adicionada para ${customer.name}.`);
+        renderDebtorsList();
+    } catch (error) {
+        console.error("Erro ao adicionar dívida manual:", error);
+        showModal('Erro', 'Não foi possível adicionar a dívida.');
+    }
 }
+
+// --- MODIFICAÇÃO NAS FUNÇÕES DE EXTRATO ---
+
+// Precisamos de modificar 'addDebtTransaction' para aceitar a descrição
+
+
+// E modificar 'openDebtStatementModal' para mostrar a descrição
+
 // Função para fechar o modal de edição de produto
 window.closeEditProductModal = function () {
     const editProductModal = document.getElementById('edit-product-modal');
@@ -1492,40 +1578,34 @@ window.closeDebtPaymentModal = function () {
     debtPaymentModal.classList.add('hidden');
 }
 
+// Versão atualizada para o modal da lista de clientes
 async function handleConfirmDebtPayment() {
     const customerId = document.getElementById('debt-customer-id').value;
-    const customerRef = doc(db, "customers", customerId);
 
-    const amount = parseFloat(document.getElementById('debt-payment-amount').value);
-    const method = document.getElementById('debt-payment-method').value;
-
-    const customer = customers.find(c => c.id === customerId);
-    if (!customer || isNaN(amount) || amount <= 0 || amount > (customer.debt || 0)) {
-        showModal('Erro', 'Valor de pagamento inválido.');
-        return;
-    }
-
-    const newDebt = (customer.debt || 0) - amount;
-
+    // --- MUDANÇA IMPORTANTE AQUI ---
+    // Em vez de usar a variável local, buscamos os dados mais recentes do cliente do Firestore
     try {
-        await updateDoc(customerRef, { debt: newDebt });
-        if (currentShift) {
-            currentShift.debtPayments.push({ customerId, customerName: customer.name, amount, method });
-            await updateCurrentDayInFirestore();
+        const customerRef = doc(db, "customers", customerId);
+        const customerSnap = await getDoc(customerRef);
+
+        if (!customerSnap.exists()) {
+            showModal('Erro', 'Cliente não encontrado na base de dados.');
+            return;
         }
-        await logActivity('PAGAMENTO_DIVIDA', {
-            customerId: customer.id,
-            customerName: customer.name,
-            amount: amount,
-            method: method
-        }, currentShift.openedBy);
-        await loadInitialData();
-        renderDebtorsList();
+
+        const customer = { id: customerSnap.id, ...customerSnap.data() }; // Objeto do cliente 100% atualizado
+
+        const amountPaid = parseCurrency(document.getElementById('debt-payment-amount').value);
+        const method = document.getElementById('debt-payment-method').value;
+
+        // Chamamos a nossa função central com os dados frescos da base de dados
+        await processDebtPayment(customer, amountPaid, method);
+
         closeDebtPaymentModal();
-        showModal('Pagamento Recebido', `${formatCurrency(amount)} foram abatidos da dívida de ${customer.name}.`);
+
     } catch (error) {
-        console.error("Erro ao atualizar dívida:", error);
-        showModal("Erro de Base de Dados", "Não foi possível atualizar a dívida do cliente.");
+        console.error("Erro ao buscar cliente ou processar pagamento:", error);
+        showModal('Erro', 'Não foi possível completar a operação.');
     }
 }
 
@@ -1875,171 +1955,160 @@ function addDiversosToCart(itemName, itemPrice) {
         price: itemPrice,
         quantity: 1,
         stock: Infinity,
-        minStock: 0
+        minStock: 0,
+        isDiversos: true // MELHORIA: Adicionamos esta flag para ser explícito
     };
     cart.push(cartItem);
     renderCart();
     closeDiversosModal();
-    focusOnBarcode(); // <-- Adicionar aqui
-
+    focusOnBarcode();
 }
 
 function handleDiversosItemClick(e) {
     if (e.target.classList.contains('diversos-item-btn')) {
         const itemName = e.target.dataset.item;
         const priceStr = prompt(`Digite o valor para "${itemName}":`);
+
+        // Usamos a nossa nova função de parse robusta aqui
         const price = parseCurrency(priceStr);
 
         if (!isNaN(price) && price > 0) {
             addDiversosToCart(itemName, price);
-        } else if (priceStr !== null) {
+        } else if (priceStr !== null) { // Apenas mostra erro se o utilizador não clicou em "Cancelar"
             showModal('Valor Inválido', 'Por favor, insira um preço válido.');
         }
     }
 }
-
+/**
+ * Confirma e salva a venda em progresso.
+ */
 async function confirmSale() {
     const confirmButton = document.getElementById('confirm-sale-button');
     confirmButton.disabled = true;
     confirmButton.textContent = 'Processando...';
 
-    const customerId = document.getElementById('payment-modal-customer-select').value;
-    saleInProgress.customerId = customerId;
-
     try {
-        const saleTotal = saleInProgress.total;
-        let change = 0;
+        if (saleInProgress.payments.length === 0 && selectedPaymentMethod === 'Fiado') {
+            saleInProgress.payments.push({ method: 'Fiado', amount: saleInProgress.total });
+        }
 
-        // SE O MÉTODO SELECIONADO FOR FIADO
-        if (selectedPaymentMethod === 'Fiado') {
-            if (customerId === "1") {
-                showModal('Ação Inválida', 'Selecione um cliente para vendas a fiado.');
+        const saleId = crypto.randomUUID();
+        const saleData = {
+            ...saleInProgress,
+            id: saleId,
+            timestamp: new Date().toISOString(),
+            shiftId: currentShift.id
+        };
+
+        const fiadoPayment = saleInProgress.payments.find(p => p.method === 'Fiado');
+
+        if (fiadoPayment) {
+            const customerId = document.getElementById('payment-modal-customer-select').value;
+            const customer = customers.find(c => c.id === customerId);
+
+            if (!customerId || customerId === "1") {
+                showModal('Ação Inválida', 'Selecione um cliente cadastrado para vendas a fiado.');
                 confirmButton.disabled = false;
                 confirmButton.textContent = 'Confirmar Venda';
                 return;
             }
-            // Adiciona o pagamento Fiado para que ele apareça no recibo
-            saleInProgress.payments = [{ method: 'Fiado', amount: saleTotal }];
 
-            // Atualiza a dívida do cliente
-            const customerRef = doc(db, "customers", customerId);
-            const customer = customers.find(c => c.id === customerId);
-            const newDebt = (customer.debt || 0) + saleTotal;
-            await updateDoc(customerRef, { debt: newDebt });
+            if (customer) {
+                const newDebtAmount = parseFloat((customer.debt + fiadoPayment.amount).toFixed(2));
+                const customerRef = doc(db, "customers", customerId);
+                await updateDoc(customerRef, { debt: newDebtAmount });
+                customer.debt = newDebtAmount;
 
-        } else { // LÓGICA DE PAGAMENTO NORMAL (NÃO-FIADO)
+                // --- ALTERAÇÃO PRINCIPAL AQUI ---
+                // Agora passamos 'saleData.items' para guardar os produtos no histórico
+                await addDebtTransaction(customerId, 'sale', fiadoPayment.amount, saleId, 'Venda a Fiado', saleData.items);
 
-            const payments = JSON.parse(JSON.stringify(saleInProgress.payments));
-            const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-
+                saleData.notes = `Venda fiado para o cliente ${customer.name}.`;
+            }
+        } else {
+            const saleTotal = saleInProgress.total;
+            const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
             if (totalPaid > saleTotal) {
-                change = totalPaid - saleTotal;
-                let totalPaidInCash = payments
-                    .filter(p => p.method === 'Dinheiro')
-                    .reduce((sum, p) => sum + p.amount, 0);
-
-                if (totalPaidInCash >= change) {
-                    let changeToDeduct = change;
-                    for (let i = payments.length - 1; i >= 0; i--) {
-                        if (payments[i].method === 'Dinheiro') {
-                            const deduction = Math.min(payments[i].amount, changeToDeduct);
-                            payments[i].amount -= deduction;
-                            changeToDeduct -= deduction;
-                            if (changeToDeduct <= 0) break;
-                        }
-                    }
-                } else {
-                    const nonCashPayments = payments.filter(p => p.method !== 'Dinheiro');
-                    const cashToReturn = change - totalPaidInCash;
-                    payments = [...nonCashPayments];
-                    payments.push({ method: 'Dinheiro', amount: -cashToReturn });
-                }
-                saleInProgress.payments = payments.filter(p => p.amount !== 0);
+                const change = totalPaid - saleTotal;
+                saleData.change = change;
             }
         }
 
-        // RESTANTE DA LÓGICA COMUM A AMBOS OS CENÁRIOS
-        const activeShift = currentDay.shifts.find(s => !s.endTime);
-        if (!activeShift) {
-            showModal('Erro', 'Nenhum turno ativo para registrar a venda.');
-            return;
-        }
+        await setDoc(doc(db, "users", auth.currentUser.uid, "sales", saleId), saleData);
 
-        saleInProgress.id = crypto.randomUUID();
-        saleInProgress.date = new Date().toISOString();
-        activeShift.sales.push(saleInProgress);
-        await updateCurrentDayInFirestore();
+        const customer = customers.find(c => c.id === saleData.customerId);
+        await logActivity('VENDA_CRIADA', {
+            saleId: saleData.id,
+            total: saleData.total,
+            customerName: customer ? customer.name : 'Consumidor'
+        }, currentShift.openedBy);
 
-        for (const cartItem of saleInProgress.items) {
-            if (cartItem.id) {
-                const productRef = doc(db, "products", cartItem.id);
-                const newStock = cartItem.stock - cartItem.quantity;
+        for (const item of saleInProgress.items) {
+            const product = products.find(p => p.id === item.id);
+            if (product && !item.isDiversos) {
+                const newStock = product.stock - item.quantity;
+                const productRef = doc(db, "products", product.id);
                 await updateDoc(productRef, { stock: newStock });
             }
         }
 
-        const customer = customers.find(c => c.id === saleInProgress.customerId);
-        await logActivity('VENDA_CRIADA', {
-            saleId: saleInProgress.id,
-            total: saleInProgress.total,
-            customerName: customer ? customer.name : 'Consumidor'
-        }, currentShift.openedBy);
-
-        await loadInitialData();
-        renderAll();
-        resetPdv();
-
-        renderReceipt(saleInProgress, change);
         closePaymentModal();
+        renderReceipt(saleData, saleData.change || 0);
 
     } catch (error) {
         console.error("Erro ao confirmar venda:", error);
-        showModal("Erro", "Não foi possível confirmar a venda. Tente novamente.");
+        showModal('Erro', 'Não foi possível salvar a venda. Tente novamente.');
     } finally {
         confirmButton.disabled = false;
         confirmButton.textContent = 'Confirmar Venda';
     }
 }
 
-function renderReceipt(saleData, change, warning = '') {
+function renderReceipt(data, change, warning = '') {
     const ci = settings.companyInfo;
     document.getElementById('receipt-store-name').textContent = ci.name;
     document.getElementById('receipt-store-address').textContent = ci.address;
     document.getElementById('receipt-store-cnpj').textContent = ci.cnpj;
     document.getElementById('receipt-store-message').textContent = ci.receiptMessage;
-    document.getElementById('receipt-date').textContent = formatDateTime(saleData.date);
-    document.getElementById('receipt-sale-id').textContent = saleData.id;
-    document.getElementById('receipt-shift-id').textContent = currentShift.id;
-
-    const customer = customers.find(c => c.id === saleData.customerId);
-    document.getElementById('receipt-customer').textContent = customer ? customer.name : 'Consumidor';
+    document.getElementById('receipt-date').textContent = formatDateTime(data.date);
+    document.getElementById('receipt-customer').textContent = data.customerName || 'Consumidor';
 
     const itemsEl = document.getElementById('receipt-items');
-    itemsEl.innerHTML = '';
-    saleData.items.forEach(item => {
-        const itemHTML = `
+    const totalEl = document.getElementById('receipt-total');
+    const paymentsEl = document.getElementById('receipt-payments');
+
+    // Nova lógica para diferenciar o tipo de recibo
+    if (data.type === 'debtPayment') {
+        // --- RECIBO DE PAGAMENTO DE DÍVIDA ---
+        document.getElementById('receipt-sale-id').parentElement.style.display = 'none';
+        itemsEl.innerHTML = `
+            <div><p>COMPROVATIVO DE PAGAMENTO</p></div>
+            <div class="my-2 border-t border-dashed"></div>
+            <div class="flex justify-between"><p>Dívida Anterior:</p> <p>${formatCurrency(data.previousDebt)}</p></div>
+            <div class="flex justify-between"><p>Valor Recebido:</p> <p>${formatCurrency(data.amountPaid)}</p></div>
+            <div class="my-2 border-t border-dashed"></div>
+            <div class="flex justify-between font-bold"><p>Novo Saldo Devedor:</p> <p>${formatCurrency(data.newDebt)}</p></div>
+        `;
+        totalEl.textContent = formatCurrency(data.amountPaid);
+
+    } else {
+        // --- RECIBO DE VENDA (LÓGICA ANTIGA) ---
+        document.getElementById('receipt-sale-id').parentElement.style.display = 'block';
+        document.getElementById('receipt-sale-id').textContent = data.id;
+        document.getElementById('receipt-shift-id').textContent = currentShift.id;
+        itemsEl.innerHTML = data.items.map(item => `
             <div>
                 <p>${item.quantity}x ${item.name}</p>
                 <p class="text-right">${formatCurrency(item.price * item.quantity)}</p>
             </div>
-        `;
-        itemsEl.innerHTML += itemHTML;
-    });
+        `).join('');
+        totalEl.textContent = formatCurrency(data.total);
+    }
 
-    document.getElementById('receipt-total').textContent = formatCurrency(saleData.total);
-
-    const paymentsEl = document.getElementById('receipt-payments');
-    paymentsEl.innerHTML = '';
-
-    // --- CORREÇÃO APLICADA AQUI ---
-    // Filtramos a lista de pagamentos para mostrar APENAS os valores positivos (o que o cliente pagou).
-    // O pagamento negativo de cashback, que é um controle interno, será ignorado no recibo.
-    const customerPayments = saleData.payments.filter(p => p.amount > 0);
-
-    customerPayments.forEach(p => {
-        paymentsEl.innerHTML += `<p>${p.method}: <span>${formatCurrency(p.amount)}</span></p>`;
-    });
-    // --- FIM DA CORREÇÃO ---
+    // Parte comum a ambos os recibos
+    paymentsEl.innerHTML = data.payments.filter(p => p.amount > 0).map(p =>
+        `<p>${p.method}: <span>${formatCurrency(p.amount)}</span></p>`
+    ).join('');
 
     document.getElementById('receipt-change').textContent = formatCurrency(change);
 
@@ -2059,11 +2128,25 @@ function renderReceipt(saleData, change, warning = '') {
 function printReceipt() {
     window.print();
 }
-function closeReceiptModal() {
+// Substitua a sua função antiga por esta versão async
+async function closeReceiptModal() {
+    // Mantém a sua animação de fecho
     receiptModal.querySelector('div').classList.remove('scale-100');
-    setTimeout(() => {
+
+    setTimeout(async () => {
         receiptModal.classList.add('hidden');
-        focusOnBarcode(); // <-- Adicionar aqui
+
+        // 1. Limpa o carrinho do PDV para a próxima venda
+        resetPdv();
+
+        // 2. Força a busca dos dados mais recentes do Firebase (produtos, clientes, etc.)
+        await loadInitialData();
+
+        // 3. Redesenha todos os componentes da aplicação com os novos dados
+        renderAll();
+
+        // 4. Volta o foco para o campo de código de barras para a próxima venda
+        focusOnBarcode();
     }, 200);
 }
 
@@ -2124,7 +2207,7 @@ function renderInventoryManagement(productsToRender = products) {
     console.log('Produtos a renderizar:', productsToRender);
     const inventoryManagementTableBodyEl = document.getElementById('inventory-management-table-body');
     if (!inventoryManagementTableBodyEl) return;
-    
+
     if (productsToRender.length === 0) {
         inventoryManagementTableBodyEl.innerHTML = `
             <p class="p-4 text-center text-gray-500">Nenhum produto encontrado.</p>
@@ -2151,10 +2234,10 @@ function renderInventoryManagement(productsToRender = products) {
         </thead>
         <tbody>
             ${sortedProducts.map(product => {
-                const isLowStock = product.stock <= product.minStock;
-                const rowClass = isLowStock ? 'bg-red-50' : '';
-                const textClass = isLowStock ? 'text-red-600 font-bold' : '';
-                return `
+        const isLowStock = product.stock <= product.minStock;
+        const rowClass = isLowStock ? 'bg-red-50' : '';
+        const textClass = isLowStock ? 'text-red-600 font-bold' : '';
+        return `
                     <tr class="${rowClass}">
                         <td class="p-3">
                             <p class="font-semibold">${product.name}</p>
@@ -2168,11 +2251,145 @@ function renderInventoryManagement(productsToRender = products) {
                         </td>
                     </tr>
                 `;
-            }).join('')}
+    }).join('')}
         </tbody>
     `;
 }
 
+// ====== INÍCIO DO BLOCO DE CÓDIGO CORRETO E ÚNICO PARA A ABA CLIENTES ======
+
+// NOVA FUNÇÃO PARA RENDERIZAR A ABA DE CLIENTES COM O NOVO VISUAL
+
+// ESTA É A VERSÃO CORRETA QUE DEVE PERMANECER NO SEU CÓDIGO
+function renderCustomersTab() {
+    contentCustomers.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-800">Gestão de Clientes</h3>
+            <div class="flex gap-4">
+                <button onclick="openQuickReceiptModal()" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600">R$ Recebimento Rápido</button>
+                <button onclick="openAddCustomerModal()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700">+ Adicionar Novo Cliente</button>
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <input type="text" id="customer-list-search-input" placeholder="Pesquisar por nome ou telefone..." class="w-full p-2 border rounded-md">
+        </div>
+
+        <div class="flex justify-end items-center mb-4">
+             <div class="text-right flex items-center gap-3">
+                <div>
+                    <p class="text-sm text-gray-500">Total em Dívidas</p>
+                    <p id="total-debt-summary" class="font-bold text-lg text-red-600"></p>
+                </div>
+                <button id="toggle-debt-visibility-btn" class="p-2 rounded-full hover:bg-gray-200" title="Mostrar/Ocultar valores">
+                    </button>
+            </div>
+        </div>
+        <div id="debtors-list" class="overflow-x-auto max-h-[55vh] overflow-y-auto"></div>
+    `;
+
+    // Adiciona o event listener para o novo campo de pesquisa
+    const searchInput = document.getElementById('customer-list-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce((e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredCustomers = customers.filter(c =>
+                c.name.toLowerCase().includes(searchTerm) ||
+                (c.phone && c.phone.includes(searchTerm))
+            );
+            renderDebtorsList(filteredCustomers); // Chama a renderização com a lista filtrada
+        }, 300));
+    }
+
+    renderDebtorsList(); // Renderiza a lista completa inicialmente
+}
+
+// NOVAS FUNÇÕES DE CONTROLO DOS MODAIS
+function openAddCustomerModal() {
+    document.getElementById('add-customer-modal').classList.remove('hidden');
+    document.getElementById('modal-new-customer-name').focus();
+}
+
+function closeAddCustomerModal() {
+    document.getElementById('add-customer-modal').classList.add('hidden');
+    document.getElementById('modal-add-customer-form').reset();
+}
+
+function openQuickReceiptModal() {
+    document.getElementById('quick-receipt-modal').classList.remove('hidden');
+    document.getElementById('modal-receipts-payment-area').classList.add('hidden');
+    document.getElementById('modal-receipts-search-results').innerHTML = '';
+    document.getElementById('modal-receipts-customer-search').value = '';
+    document.getElementById('modal-receipts-customer-search').focus();
+    selectedCustomerForPayment = null;
+}
+
+function closeQuickReceiptModal() {
+    document.getElementById('quick-receipt-modal').classList.add('hidden');
+}
+
+// FUNÇÕES DE LÓGICA ATUALIZADAS
+async function handleAddCustomer(event) {
+    event.preventDefault();
+    const name = document.getElementById('modal-new-customer-name').value.trim();
+    const phone = document.getElementById('modal-new-customer-phone').value.trim();
+    if (!name) return showModal('Erro', 'O nome do cliente é obrigatório.');
+
+    const newCustomer = { name, phone, debt: 0, usuarioId: auth.currentUser.uid };
+    try {
+        const docRef = await addDoc(collection(db, "customers"), newCustomer);
+        await logActivity('CLIENTE_ADICIONADO', { customerId: docRef.id, name, phone }, currentShift ? currentShift.openedBy : 'Sistema');
+        await loadInitialData();
+        renderDebtorsList();
+        closeAddCustomerModal();
+        showModal('Sucesso!', 'Novo cliente cadastrado.');
+    } catch (error) {
+        console.error("Erro ao adicionar cliente:", error);
+        showModal('Erro de Base de Dados', 'Não foi possível guardar o cliente.');
+    }
+}
+
+const handleCustomerSearchForPayment = debounce((searchTerm) => {
+    const resultsContainer = document.getElementById('modal-receipts-search-results');
+    if (!searchTerm) { resultsContainer.innerHTML = ''; return; }
+    const filteredCustomers = customers.filter(c => c.debt > 0 && c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (filteredCustomers.length > 0) {
+        resultsContainer.innerHTML = filteredCustomers.map(c => `
+            <div data-customer-id="${c.id}" class="p-3 border-b hover:bg-gray-100 cursor-pointer customer-search-result">
+                <p class="font-semibold">${c.name}</p>
+                <p class="text-sm text-red-600">${formatCurrency(c.debt)}</p>
+            </div>
+        `).join('');
+    } else {
+        resultsContainer.innerHTML = '<p class="p-3 text-gray-500">Nenhum cliente com dívida encontrado.</p>';
+    }
+}, 300);
+
+function selectCustomerForPayment(customerId) {
+    selectedCustomerForPayment = customers.find(c => c.id === customerId);
+    if (!selectedCustomerForPayment) return;
+    document.getElementById('modal-receipts-customer-search').value = '';
+    document.getElementById('modal-receipts-search-results').innerHTML = '';
+    document.getElementById('modal-receipts-payment-area').classList.remove('hidden');
+    document.getElementById('modal-receipts-customer-name').textContent = selectedCustomerForPayment.name;
+    document.getElementById('modal-receipts-current-debt').textContent = formatCurrency(selectedCustomerForPayment.debt);
+    document.getElementById('modal-receipts-payment-amount').value = selectedCustomerForPayment.debt.toFixed(2).replace('.', ',');
+    document.getElementById('modal-receipts-payment-amount').focus();
+}
+
+// Versão simplificada para o "Recebimento Rápido"
+async function handleDebtPaymentFromReceiptsTab() {
+    if (!selectedCustomerForPayment) return;
+
+    const amountPaid = parseCurrency(document.getElementById('modal-receipts-payment-amount').value);
+    const method = document.getElementById('modal-receipts-payment-method').value;
+
+    await processDebtPayment(selectedCustomerForPayment, amountPaid, method);
+
+    closeQuickReceiptModal();
+}
+
+// ====== FIM DO BLOCO ======
 async function handleAddProduct(event) {
     event.preventDefault();
     if (!auth.currentUser) return;
@@ -2376,51 +2593,46 @@ function onInventoryScanSuccess(decodedText) {
     }
 }
 
-// --- END BARCODE SCANNER LOGIC ---
+
 
 // --- INICIALIZAÇÃO E EVENTOS ---
+// --- INICIALIZAÇÃO E EVENTOS ---
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Static Listeners (these elements are always in the DOM) ---
+    // --- Listeners Estáticos (sempre na página) ---
     loginForm.addEventListener('submit', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
     forgotPasswordLink.addEventListener('click', handleForgotPassword);
     addPaymentForm.addEventListener('submit', handleAddPayment);
     confirmSaleButton.addEventListener('click', confirmSale);
     document.getElementById('update-product-button')?.addEventListener('click', handleUpdateProduct);
-
     document.getElementById('update-customer-button')?.addEventListener('click', handleUpdateCustomer);
     document.getElementById('confirm-debt-payment-button')?.addEventListener('click', handleConfirmDebtPayment);
     document.getElementById('print-receipt-button').addEventListener('click', printReceipt);
     document.getElementById('close-receipt-button').addEventListener('click', closeReceiptModal);
     document.getElementById('open-drawer-button').addEventListener('click', handleOpenDrawer);
 
-    // --- Event Delegation for Dynamic Content ---
+    // --- Listeners para Conteúdo Dinâmico (Dia e Turno) ---
     document.getElementById('open-day-form')?.addEventListener('submit', handleOpenDay);
     document.getElementById('close-shift-button')?.addEventListener('click', handleCloseShift);
     document.getElementById('open-shift-form')?.addEventListener('submit', handleOpenShift);
     document.getElementById('close-day-button')?.addEventListener('click', handleCloseDay);
 
+    // --- Listeners para Abas (usando delegação de eventos onde possível) ---
     contentPdv.addEventListener('click', function (e) {
-        if (e.target.id === 'start-sale-button') startNewSale(e);
         if (e.target.id === 'checkout-button') handleCheckout(e);
         if (e.target.id === 'cancel-sale-button') resetPdv();
         if (e.target.id === 'diversos-button') openDiversosModal();
-        if (e.target.id === 'pdv-scan-button') {
-            startScanner(onPdvScanSuccess);
-        }
+        if (e.target.id === 'pdv-scan-button') startScanner(onPdvScanSuccess);
     });
-    contentPdv.addEventListener('keypress', function (e) {
-        if (e.target.id === 'barcode-input-field') handleBarcodeKeypress(e);
+    contentPdv.addEventListener('input', function (e) {
+        if (e.target.id === 'barcode-input-field') handleBarcodeAutoDetect(e.target);
     });
 
-    // AQUI ESTÁ O CÓDIGO CORRETO PARA A ABA DE ESTOQUE
     contentInventory.addEventListener('submit', function (e) {
         if (e.target.id === 'add-product-form') handleAddProduct(e);
     });
     contentInventory.addEventListener('click', function (e) {
-        if (e.target.id === 'inventory-scan-button') {
-            startScanner(onInventoryScanSuccess);
-        }
+        if (e.target.id === 'inventory-scan-button') startScanner(onInventoryScanSuccess);
     });
     contentInventory.addEventListener('keypress', function (e) {
         if (e.target.id === 'inventory-barcode-input' && e.key === 'Enter') {
@@ -2429,68 +2641,314 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.value = '';
         }
     });
-    // FIM DO CÓDIGO CORRIGIDO
 
-    contentCustomers.addEventListener('submit', function (e) {
-        if (e.target.id === 'add-customer-form') handleAddCustomer(e);
-    });
-
-    // NEW: Settings event listeners
     contentSettings.addEventListener('submit', function (e) {
         if (e.target.id === 'company-info-form') handleSaveCompanyInfo(e);
         if (e.target.id === 'add-operator-form') handleAddOperator(e);
     });
 
+    // --- Listeners para os Modais ---
     paymentModal.addEventListener('click', (e) => {
         if (e.target.classList.contains('payment-method-btn')) {
             selectedPaymentMethod = e.target.dataset.method;
+            if (selectedPaymentMethod === 'Fiado') {
+                saleInProgress.payments = [];
+            }
             renderPaymentModal();
         }
     });
-
     document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
-
     document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
 
-    debtPaymentModal.addEventListener('click', (e) => {
-        if (e.target.id === 'pay-full-debt-button') {
-            const customerId = document.getElementById('debt-customer-id').value;
-            const customer = customers.find(c => c.id === customerId);
-            if (customer) {
-                document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2).replace('.', ',');
+    // Listeners para os NOVOS modais da aba Clientes
+    const addCustomerFormModal = document.getElementById('modal-add-customer-form');
+    if (addCustomerFormModal) {
+        addCustomerFormModal.addEventListener('submit', handleAddCustomer);
+    }
+    const quickReceiptModal = document.getElementById('quick-receipt-modal');
+    if (quickReceiptModal) {
+        const searchResultsEl = quickReceiptModal.querySelector('#modal-receipts-search-results');
+        const quickReceiptForm = quickReceiptModal.querySelector('#modal-quick-receipt-form');
+
+        quickReceiptModal.addEventListener('input', (e) => {
+            if (e.target.id === 'modal-receipts-customer-search') handleCustomerSearchForPayment(e.target.value);
+        });
+        quickReceiptModal.addEventListener('click', (e) => {
+            if (e.target.id === 'modal-receipts-confirm-payment-button') handleDebtPaymentFromReceiptsTab();
+            if (e.target.id === 'modal-receipts-pay-full-debt-button') {
+                if (selectedCustomerForPayment) document.getElementById('modal-receipts-payment-amount').value = selectedCustomerForPayment.debt.toFixed(2).replace('.', ',');
+            }
+        });
+        if (searchResultsEl) {
+            searchResultsEl.addEventListener('click', (e) => {
+                const customerDiv = e.target.closest('.customer-search-result');
+                if (customerDiv) selectCustomerForPayment(customerDiv.dataset.customerId);
+            });
+        }
+        if (quickReceiptForm) {
+            quickReceiptForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                document.getElementById('modal-receipts-confirm-payment-button').click();
+            });
+        }
+    }
+
+    // Listener para o modal antigo de Receber Dívida (da lista)
+    // A NOVA VERSÃO CORRIGIDA
+    contentCustomers.addEventListener('click', (e) => {
+        // Lógica que você já tinha
+        if (e.target.id === 'receipts-confirm-payment-button') {
+            handleDebtPaymentFromReceiptsTab();
+        }
+        if (e.target.id === 'receipts-pay-full-debt-button') {
+            if (selectedCustomerForPayment) {
+                document.getElementById('receipts-payment-amount').value = selectedCustomerForPayment.debt.toFixed(2).replace('.', ',');
             }
         }
-});});
 
-//
+        // --- NOVO CÓDIGO ADICIONADO AQUI ---
+        // Verifica se o clique foi no botão de visibilidade ou no seu ícone
+        if (e.target.closest('#toggle-debt-visibility-btn')) {
+            toggleDebtVisibility();
+        }
+    });
+});
+
+
+// --- FIM DO NOVO CÓDIGO ---
+
+contentSettings.addEventListener('submit', function (e) {
+    if (e.target.id === 'company-info-form') handleSaveCompanyInfo(e);
+    if (e.target.id === 'add-operator-form') handleAddOperator(e);
+});
+
+paymentModal.addEventListener('click', (e) => {
+    if (e.target.classList.contains('payment-method-btn')) {
+        selectedPaymentMethod = e.target.dataset.method;
+        if (selectedPaymentMethod === 'Fiado') {
+            saleInProgress.payments = [];
+        }
+        renderPaymentModal();
+    }
+});
+
+document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
+
+document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
+
+debtPaymentModal.addEventListener('click', (e) => {
+    if (e.target.id === 'pay-full-debt-button') {
+        const customerId = document.getElementById('debt-customer-id').value;
+        const customer = customers.find(c => c.id === customerId);
+        if (customer) {
+            document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2).replace('.', ',');
+        }
+    }
+});
 // NEW: Função para mostrar o modal de escolha Editar/Excluir
 function showEditOrDeleteModal(product) {
     const modal = document.getElementById('edit-or-delete-modal');
     document.getElementById('edit-or-delete-modal-message').textContent = `O que deseja fazer com ${product.name}?`;
-    
+
     // Conecta os botões do modal às funções de edição e exclusão
     const editButton = document.getElementById('edit-product-choice-button');
     const deleteButton = document.getElementById('delete-product-choice-button');
-    
+
     // Para evitar eventos duplicados, removemos os antigos antes de adicionar os novos
     editButton.onclick = null;
     deleteButton.onclick = null;
-    
+
     editButton.onclick = () => {
         closeModalById('edit-or-delete-modal');
         openEditProductModal(product.id);
     };
-    
+
     deleteButton.onclick = () => {
         closeModalById('edit-or-delete-modal');
         handleDeleteProduct(product.id);
     };
-    
+
     modal.classList.remove('hidden');
 }
 
 // NEW: Função auxiliar para fechar qualquer modal por ID
-window.closeModalById = function(modalId) {
+window.closeModalById = function (modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.classList.add('hidden');
 };
+
+/**
+ * Adiciona uma transação (nova dívida ou pagamento) ao histórico de um cliente.
+ * @param {string} customerId - O ID do cliente.
+ * @param {'sale' | 'payment'} type - O tipo de transação.
+ * @param {number} amount - O valor da transação.
+ * @param {string} [saleId=null] - O ID da venda (se for uma nova dívida).
+ */
+async function addDebtTransaction(customerId, type, amount, saleId = null, description = '', items = []) {
+    if (!auth.currentUser) return;
+    try {
+        const debtHistoryRef = collection(db, "users", auth.currentUser.uid, "debt_history");
+        // Adicionamos o campo 'items' ao objeto que é salvo na base de dados
+        await addDoc(debtHistoryRef, { customerId, type, amount, saleId, date: new Date().toISOString(), description, items });
+    } catch (error) {
+        console.error("Erro ao salvar transação de dívida:", error);
+    }
+}
+/**
+ * Abre o modal com o extrato de dívidas de um cliente.
+ * @param {string} customerId - O ID do cliente.
+ */
+async function openDebtStatementModal(customerId) {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    document.getElementById('statement-customer-name').textContent = customer.name;
+    document.getElementById('statement-customer-debt').textContent = formatCurrency(customer.debt);
+    const listContainer = document.getElementById('statement-transactions-list');
+    listContainer.innerHTML = '<p>A carregar histórico...</p>';
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+        const historyRef = collection(db, "users", user.uid, "debt_history");
+        const q = query(historyRef, where("customerId", "==", customerId), orderBy("date", "desc"));
+        const querySnapshot = await getDocs(q);
+        const transactions = querySnapshot.docs.map(doc => doc.data());
+
+        if (transactions.length === 0) {
+            listContainer.innerHTML = '<p class="text-gray-500">Nenhum histórico de transação encontrado.</p>';
+        } else {
+            listContainer.innerHTML = transactions.map(t => {
+                const date = new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const isDebit = t.type === 'sale';
+                const colorClass = isDebit ? 'text-red-600' : 'text-green-600';
+
+                let label = isDebit ? 'Nova Dívida (Venda)' : 'Pagamento Recebido';
+                if (isDebit && !t.saleId) {
+                    label = t.description ? `Dívida Manual: ${t.description}` : 'Dívida Manual';
+                }
+
+                // --- NOVA LÓGICA PARA MOSTRAR OS ITENS ---
+                let itemsHTML = '';
+                if (t.items && t.items.length > 0) {
+                    itemsHTML = `
+                        <ul class="list-disc list-inside text-xs text-gray-600 pl-4 mt-1">
+                            ${t.items.map(item => `<li>${item.quantity}x ${item.name} (${formatCurrency(item.price)})</li>`).join('')}
+                        </ul>
+                    `;
+                }
+
+                return `
+                    <div class="flex justify-between items-start p-2 rounded-md ${isDebit ? 'bg-red-50' : 'bg-green-50'}">
+                        <div>
+                            <p class="font-semibold ${colorClass}">${label}</p>
+                            ${itemsHTML} 
+                            <p class="text-sm text-gray-500 mt-1">${date}</p>
+                        </div>
+                        <p class="font-bold text-lg ${colorClass} pt-1">${formatCurrency(t.amount)}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error("Erro ao buscar histórico de dívidas:", error);
+        listContainer.innerHTML = '<p class="text-red-500">Ocorreu um erro ao carregar o histórico.</p>';
+    }
+    document.getElementById('debt-statement-modal').classList.remove('hidden');
+}
+
+/**
+ * Fecha o modal do extrato de dívida.
+ */
+function closeDebtStatementModal() {
+    document.getElementById('debt-statement-modal').classList.add('hidden');
+}
+
+// Exponha as funções globais necessárias para o HTML
+window.openDebtStatementModal = openDebtStatementModal;
+window.closeDebtStatementModal = closeDebtStatementModal;
+window.openAddCustomerModal = openAddCustomerModal;
+window.closeAddCustomerModal = closeAddCustomerModal;
+window.openQuickReceiptModal = openQuickReceiptModal;
+window.closeQuickReceiptModal = closeQuickReceiptModal;
+window.showModal = showModal;
+window.closeModal = closeModal;
+window.openManualDebtModal = openManualDebtModal;
+window.closeManualDebtModal = closeManualDebtModal;
+
+
+
+/**
+ * Função central para processar qualquer pagamento de dívida.
+ * Calcula troco, atualiza a base de dados, abre a gaveta e gera o recibo.
+ * @param {object} customer - O objeto completo do cliente.
+ * @param {number} amountPaid - O valor que o cliente pagou.
+ * @param {string} method - A forma de pagamento.
+ */
+async function processDebtPayment(customer, amountPaid, method) {
+    const debt = customer.debt;
+
+    // Validação
+    if (isNaN(amountPaid) || amountPaid <= 0) {
+        showModal('Erro', 'Valor de pagamento inválido.');
+        return;
+    }
+
+    const amountToClear = Math.min(amountPaid, debt);
+    const newDebt = parseFloat((debt - amountToClear).toFixed(2));
+    const change = parseFloat((amountPaid > debt ? amountPaid - debt : 0).toFixed(2));
+
+    try {
+        const customerRef = doc(db, "customers", customer.id);
+        await updateDoc(customerRef, { debt: newDebt });
+        customer.debt = newDebt; // Atualiza o objeto local
+
+        await addDebtTransaction(customer.id, 'payment', amountToClear);
+        await logActivity('PAGAMENTO_DIVIDA', { customerId: customer.id, customerName: customer.name, amount: amountToClear, method });
+
+        if (method === 'Dinheiro') {
+            await handleOpenDrawer(true);
+        }
+
+        const paymentData = {
+            type: 'debtPayment',
+            customerName: customer.name,
+            date: new Date().toISOString(),
+            previousDebt: debt,
+            amountPaid: amountPaid,
+            newDebt: newDebt,
+            payments: [{ method: method, amount: amountPaid }],
+            change: change
+        };
+
+        renderReceipt(paymentData, change);
+
+        await loadInitialData();
+        renderAll(); // Re-renderiza tudo para garantir consistência
+
+    } catch (error) {
+        console.error("Erro ao processar pagamento de dívida:", error);
+        showModal("Erro de Base de Dados", "Não foi possível processar o pagamento.");
+    }
+}
+
+// Adicione estas duas novas funções ao seu script.js
+
+function renderDebtVisibilityToggle() {
+    const toggleBtn = document.getElementById('toggle-debt-visibility-btn');
+    if (!toggleBtn) return;
+
+    if (areDebtsVisible) {
+        // Ícone de "olho aberto" (SVG)
+        toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`;
+    } else {
+        // Ícone de "olho fechado" (SVG)
+        toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 1.274-4.057 5.064-7 9.542-7 .847 0 1.673.124 2.458.35M18.825 13.875A10.133 10.133 0 0119.5 12c-1.274-4.057-5.064-7-9.542-7a10.05 10.05 0 00-1.218.068M3.175 3.175l18.85 18.85M9.825 9.825A3 3 0 0012 15a3 3 0 002.175-5.175M15 12a3 3 0 01-3 3" /></svg>`;
+    }
+}
+
+function toggleDebtVisibility() {
+    areDebtsVisible = !areDebtsVisible; // Inverte o valor (true -> false, false -> true)
+    renderDebtorsList(); // Re-renderiza a lista para aplicar a mudança
+}
