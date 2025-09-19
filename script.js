@@ -311,6 +311,94 @@ async function loadInitialData() {
         console.error("Erro ao carregar dados iniciais:", error);
         showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
     }
+
+    try {
+        // Fetch settings first
+        const settingsRef = doc(db, "settings", uid);
+        const settingsSnap = await getDoc(settingsRef);
+        let settingsData = {};
+        let needsUpdate = false;
+
+        console.log("Settings snapshot exists:", settingsSnap.exists()); // DEBUG
+
+        if (settingsSnap.exists()) {
+            settingsData = settingsSnap.data();
+            console.log("Loaded settings:", settingsData); // DEBUG
+        } else {
+            console.log("No settings found, creating default settings."); // DEBUG
+            settingsData = {
+                companyInfo: {
+                    name: 'Sua Loja Aqui',
+                    address: 'Seu Endereço',
+                    cnpj: '00.000.000/0000-00',
+                    receiptMessage: 'Obrigado pela preferência!'
+                },
+                operators: ['Caixa 1', 'Gerente']
+            };
+            needsUpdate = true;
+        }
+
+        // Ensure operators array exists
+        if (!settingsData.operators) {
+            console.log("Operators not found, creating default."); // DEBUG
+            settingsData.operators = ['Caixa 1', 'Gerente'];
+            needsUpdate = true;
+        }
+
+        // Ensure companyInfo object exists
+        if (!settingsData.companyInfo) {
+            console.log("CompanyInfo not found, creating default."); // DEBUG
+            settingsData.companyInfo = {
+                name: 'Sua Loja Aqui',
+                address: 'Seu Endereço',
+                cnpj: '00.000.000/0000-00',
+                receiptMessage: 'Obrigado pela preferência!'
+            };
+            needsUpdate = true;
+        }
+
+        settings = settingsData;
+
+        if (needsUpdate) {
+            console.log("Updating settings in Firestore with defaults."); // DEBUG
+            await setDoc(settingsRef, settings, { merge: true });
+        }
+
+        const productsQuery = query(collection(db, "products"), where("usuarioId", "==", uid));
+        const productsSnapshot = await getDocs(productsQuery);
+        products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const customersQuery = query(collection(db, "customers"), where("usuarioId", "==", uid));
+        const customersSnapshot = await getDocs(customersQuery);
+        customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Query for the open day
+        const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), where("usuarioId", "==", uid), limit(1));
+        const openDaySnapshot = await getDocs(openDayQuery);
+
+        if (!openDaySnapshot.empty) {
+            const openDayDoc = openDaySnapshot.docs[0];
+            currentDay = { id: openDayDoc.id, ...openDayDoc.data() };
+            if (currentDay.shifts) {
+                currentShift = currentDay.shifts.find(shift => !shift.endTime) || null;
+            } else {
+                currentDay.shifts = [];
+                currentShift = null;
+            }
+        } else {
+            currentDay = null;
+            currentShift = null;
+        }
+
+        // Load closed days for reports
+        const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), where("usuarioId", "==", uid), orderBy("date", "desc"));
+        const closedDaysSnapshot = await getDocs(closedDaysQuery);
+        closedDays = closedDaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    } catch (error) {
+        console.error("Erro ao carregar dados iniciais:", error);
+        showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
+    }
 }
 
 // --- LOG DE ATIVIDADES ---
@@ -483,8 +571,8 @@ function renderReleaseNotes() {
 }
 
 function renderDashboardTab() {
-    const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0;
-    const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
+    const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0; // ORIGINAL: Calcula do DB
+    const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0; // ORIGINAL: Conta do DB
     const lowStockItems = products.filter(p => p.stock <= p.minStock);
     const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
 
@@ -1889,7 +1977,6 @@ function renderPaymentModal() {
     const total = parseFloat(saleInProgress.total.toFixed(2));
     const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
     const change = totalPaid > total ? totalPaid - total : 0;
-    const customerId = document.getElementById('payment-modal-customer-select')?.value || saleInProgress.customerId;
 
     document.getElementById('payment-modal-total').textContent = formatCurrency(total);
     document.getElementById('payment-modal-paid-amount').textContent = formatCurrency(totalPaid);
@@ -1897,8 +1984,8 @@ function renderPaymentModal() {
 
     const customerSelect = document.getElementById('payment-modal-customer-select');
     const customerOptions = customers.filter(c => c.id !== '1').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    customerSelect.innerHTML = `<option value="1">Consumidor</option>${customerOptions}`;
-    customerSelect.value = customerId;
+    customerSelect.innerHTML = `<option value="1" selected>Consumidor Final</option>${customerOptions}`;
+    customerSelect.value = '1';
 
     document.getElementById('payment-modal-cart-summary').innerHTML = saleInProgress.items.map(i => `<div>${i.quantity}x ${i.name}</div>`).join('');
     document.getElementById('payment-modal-payments-list').innerHTML = saleInProgress.payments.map(p => `<div class="flex justify-between bg-white p-1 rounded"><span>${p.method}</span><span class="font-semibold">${formatCurrency(p.amount)}</span></div>`).join('');
@@ -1908,7 +1995,7 @@ function renderPaymentModal() {
 
     let saleCanBeConfirmed = false;
     if (selectedPaymentMethod === 'Fiado') {
-        saleCanBeConfirmed = customerId !== '1';
+        saleCanBeConfirmed = customerSelect.value !== '1';
     } else {
         saleCanBeConfirmed = totalPaid >= total;
     }
@@ -2035,6 +2122,12 @@ async function confirmSale() {
         }
 
         await setDoc(doc(db, "users", auth.currentUser.uid, "sales", saleId), saleData);
+
+        // ADICIONADO: Adiciona a venda ao total do dia (para atualizar Painel)
+        if (currentShift && currentShift.sales) {
+            currentShift.sales.push(saleData);
+            await updateCurrentDayInFirestore(); // Salva no Firebase
+        }
 
         const customer = customers.find(c => c.id === saleData.customerId);
         await logActivity('VENDA_CRIADA', {
@@ -2657,7 +2750,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPaymentModal();
         }
     });
-    document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
+    document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
+        saleInProgress.customerId = this.value;
+    });
     document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
 
     // Listeners para os NOVOS modais da aba Clientes
@@ -2732,7 +2827,9 @@ paymentModal.addEventListener('click', (e) => {
     }
 });
 
-document.getElementById('payment-modal-customer-select').addEventListener('change', renderPaymentModal);
+document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
+    saleInProgress.customerId = this.value;
+});
 
 document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
 
