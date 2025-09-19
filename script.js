@@ -39,6 +39,7 @@ let settings = {};
 let html5QrcodeScanner = null;
 let selectedCustomerForPayment = null;
 let areDebtsVisible = true; // Controla a visibilidade dos valores de dívida
+let selectedCustomerForSale = '1'; // Mantém o cliente selecionado entre as vendas
 
 
 // --- ELEMENTOS DO DOM ---
@@ -572,6 +573,7 @@ function renderReleaseNotes() {
 
 function renderDashboardTab() {
     const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0; // ORIGINAL: Calcula do DB
+    console.log('--- PONTO 3: Total calculado para o painel ---', totalSalesToday);
     const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0; // ORIGINAL: Conta do DB
     const lowStockItems = products.filter(p => p.stock <= p.minStock);
     const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
@@ -1965,13 +1967,15 @@ function handleCheckout() {
         items: JSON.parse(JSON.stringify(cart)),
         total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
         payments: [],
-        customerId: '1',
+        customerId: selectedCustomerForSale,
     };
     selectedPaymentMethod = 'Dinheiro';
     renderPaymentModal();
     paymentModal.classList.remove('hidden');
     setTimeout(() => paymentModal.querySelector('div').classList.add('scale-100'), 10);
 }
+
+//alteraçao de logica
 
 function renderPaymentModal() {
     const total = parseFloat(saleInProgress.total.toFixed(2));
@@ -1984,22 +1988,18 @@ function renderPaymentModal() {
 
     const customerSelect = document.getElementById('payment-modal-customer-select');
     const customerOptions = customers.filter(c => c.id !== '1').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    customerSelect.innerHTML = `<option value="1" selected>Consumidor Final</option>${customerOptions}`;
-    customerSelect.value = '1';
+    customerSelect.innerHTML = `<option value="1">Consumidor Final</option>${customerOptions}`;
+    customerSelect.value = saleInProgress.customerId;
 
     document.getElementById('payment-modal-cart-summary').innerHTML = saleInProgress.items.map(i => `<div>${i.quantity}x ${i.name}</div>`).join('');
     document.getElementById('payment-modal-payments-list').innerHTML = saleInProgress.payments.map(p => `<div class="flex justify-between bg-white p-1 rounded"><span>${p.method}</span><span class="font-semibold">${formatCurrency(p.amount)}</span></div>`).join('');
 
     const remainingAmount = total - totalPaid;
-    document.getElementById('payment-amount').value = (remainingAmount > 0) ? remainingAmount.toFixed(2).replace('.', ',') : '';
+    // Preenche o campo com o valor restante (com uma pequena tolerância para evitar bugs de arredondamento)
+    document.getElementById('payment-amount').value = (remainingAmount > 0.009) ? remainingAmount.toFixed(2).replace('.', ',') : '';
 
-    let saleCanBeConfirmed = false;
-    if (selectedPaymentMethod === 'Fiado') {
-        saleCanBeConfirmed = customerSelect.value !== '1';
-    } else {
-        saleCanBeConfirmed = totalPaid >= total;
-    }
-    confirmSaleButton.disabled = !saleCanBeConfirmed;
+    // Chama a nova função para cuidar apenas do botão
+    updateSaleConfirmationButton();
 
     document.querySelectorAll('.payment-method-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -2009,8 +2009,29 @@ function renderPaymentModal() {
     });
 
     document.getElementById('add-payment-form').style.visibility = selectedPaymentMethod === 'Fiado' ? 'hidden' : 'visible';
+}//fim logica
+
+
+//19/09 - responsável apenas por habilitar ou desabilitar o botão "Confirmar Venda".
+function updateSaleConfirmationButton() {
+    const total = parseFloat(saleInProgress.total.toFixed(2));
+    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
+    const customerSelect = document.getElementById('payment-modal-customer-select');
+    const confirmSaleButton = document.getElementById('confirm-sale-button');
+
+    let saleCanBeConfirmed = false;
+    if (selectedPaymentMethod === 'Fiado') {
+        saleCanBeConfirmed = customerSelect.value !== '1';
+    } else {
+        // Usa uma tolerância para comparações de ponto flutuante
+        const amountInInput = parseCurrency(document.getElementById('payment-amount').value) || 0;
+        saleCanBeConfirmed = (totalPaid + amountInInput) >= (total - 0.009);
+    }
+    confirmSaleButton.disabled = !saleCanBeConfirmed;
 }
 
+//fim
+//limpar campo com valor e adiconar
 function handleAddPayment(event) {
     event.preventDefault();
     const amount = parseCurrency(document.getElementById('payment-amount').value);
@@ -2019,9 +2040,13 @@ function handleAddPayment(event) {
         return;
     }
     saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
+    
+    // Limpa o campo para que seja preenchido com o novo valor restante
+    document.getElementById('payment-amount').value = ''; 
+    
     renderPaymentModal();
 }
-
+//fim limpar
 window.closePaymentModal = function () {
     paymentModal.querySelector('div').classList.remove('scale-100');
     setTimeout(() => paymentModal.classList.add('hidden'), 200);
@@ -2075,6 +2100,13 @@ async function confirmSale() {
     confirmButton.textContent = 'Processando...';
 
     try {
+        if (saleInProgress.payments.length === 0 && selectedPaymentMethod !== 'Fiado') {
+            const amount = parseCurrency(document.getElementById('payment-amount').value);
+            if (amount > 0) {
+                saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
+            }
+        }
+        
         if (saleInProgress.payments.length === 0 && selectedPaymentMethod === 'Fiado') {
             saleInProgress.payments.push({ method: 'Fiado', amount: saleInProgress.total });
         }
@@ -2115,6 +2147,14 @@ async function confirmSale() {
         } else {
             const saleTotal = saleInProgress.total;
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+
+            if (totalPaid < saleTotal) {
+                showModal('Erro', 'O valor pago é insuficiente.');
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Confirmar Venda';
+                return;
+            }
+
             if (totalPaid > saleTotal) {
                 const change = totalPaid - saleTotal;
                 saleData.change = change;
@@ -2126,6 +2166,7 @@ async function confirmSale() {
         // ADICIONADO: Adiciona a venda ao total do dia (para atualizar Painel)
         if (currentShift && currentShift.sales) {
             currentShift.sales.push(saleData);
+            console.log('--- PONTO 1: Venda adicionada ao turno ---', currentShift.sales.map(s => s.total));
             await updateCurrentDayInFirestore(); // Salva no Firebase
         }
 
@@ -2136,13 +2177,21 @@ async function confirmSale() {
             customerName: customer ? customer.name : 'Consumidor'
         }, currentShift.openedBy);
 
+
         for (const item of saleInProgress.items) {
             const product = products.find(p => p.id === item.id);
             if (product && !item.isDiversos) {
                 const newStock = product.stock - item.quantity;
                 const productRef = doc(db, "products", product.id);
                 await updateDoc(productRef, { stock: newStock });
+                product.stock = newStock; // <-- ADICIONE ESTA LINHA
             }
+        
+        }
+        if (fiadoPayment) {
+            selectedCustomerForSale = saleData.customerId;
+        } else {
+            selectedCustomerForSale = '1';
         }
 
         closePaymentModal();
@@ -2222,6 +2271,7 @@ function printReceipt() {
     window.print();
 }
 // Substitua a sua função antiga por esta versão async
+
 async function closeReceiptModal() {
     // Mantém a sua animação de fecho
     receiptModal.querySelector('div').classList.remove('scale-100');
@@ -2232,10 +2282,11 @@ async function closeReceiptModal() {
         // 1. Limpa o carrinho do PDV para a próxima venda
         resetPdv();
 
-        // 2. Força a busca dos dados mais recentes do Firebase (produtos, clientes, etc.)
-        await loadInitialData();
+        // 2. REMOVIDO: A chamada a loadInitialData() era desnecessária e causava o bug.
+        // await loadInitialData();
+        console.log('--- PONTO 2: Dados antes de redesenhar o painel ---', currentDay.shifts.flatMap(s => s.sales).map(s => s.total));
 
-        // 3. Redesenha todos os componentes da aplicação com os novos dados
+        // 3. Redesenha todos os componentes da aplicação com os dados locais atualizados
         renderAll();
 
         // 4. Volta o foco para o campo de código de barras para a próxima venda
@@ -2752,7 +2803,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
         saleInProgress.customerId = this.value;
+                renderPaymentModal();
+
     });
+    document.getElementById('payment-amount').addEventListener('input', updateSaleConfirmationButton);
     document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
 
     // Listeners para os NOVOS modais da aba Clientes
