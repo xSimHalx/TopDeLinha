@@ -1217,7 +1217,8 @@ async function handleSaveCompanyInfo(event) {
         showModal('Sucesso', 'Informações da empresa salvas.');
     } catch (error) {
         console.error("Erro ao salvar informações da empresa:", error);
-        showModal('Erro', 'Não foi possível salvar as informações.');
+        logErrorToFirestore(error, 'handleSaveCompanyInfo');
+        showModal('Erro', 'Não foi possível salvar as informações da empresa. O erro foi reportado.');
     }
 }
 
@@ -1244,7 +1245,8 @@ async function handleAddOperator(event) {
         document.getElementById('add-operator-form').reset();
     } catch (error) {
         console.error("Erro ao adicionar operador:", error);
-        showModal('Erro', 'Não foi possível adicionar o operador.');
+        logErrorToFirestore(error, 'handleAddOperator');
+        showModal('Erro', 'Não foi possível adicionar o operador. O erro foi reportado.');
     }
 }
 
@@ -1262,7 +1264,8 @@ window.handleRemoveOperator = async function (operatorName) {
         renderCashRegisterTab(); // Update dropdowns elsewhere
     } catch (error) {
         console.error("Erro ao remover operador:", error);
-        showModal('Erro', 'Não foi possível remover o operador.');
+        logErrorToFirestore(error, 'handleRemoveOperator');
+        showModal('Erro', 'Não foi possível remover o operador. O erro foi reportado.');
     }
 }
 
@@ -1637,7 +1640,8 @@ window.handleDeleteProduct = async function (productId) {
         renderAll();
     } catch (error) {
         console.error("Erro ao excluir produto:", error);
-        showModal('Erro', 'Não foi possível excluir o produto. Tente novamente.');
+        logErrorToFirestore(error, 'handleDeleteProduct');
+        showModal('Erro', 'Não foi possível excluir o produto. O erro foi reportado.');
     }
 }
 
@@ -1761,7 +1765,8 @@ async function handleUpdateProduct(event) {
         renderAll();
     } catch (error) {
         console.error("Erro ao atualizar produto:", error);
-        showModal('Erro', 'Não foi possível salvar as alterações do produto. Tente novamente.');
+        logErrorToFirestore(error, 'handleUpdateProduct');
+        showModal('Erro', 'Não foi possível salvar as alterações do produto. O erro foi reportado.');
     }
 }
 
@@ -1786,7 +1791,8 @@ async function handleUpdateCustomer() {
         showModal('Sucesso', 'Dados do cliente atualizados.');
     } catch (error) {
         console.error("Erro ao atualizar cliente:", error);
-        showModal("Erro de Base de Dados", "Não foi possível atualizar os dados do cliente.");
+        logErrorToFirestore(error, 'handleUpdateCustomer');
+        showModal("Erro de Base de Dados", "Não foi possível atualizar os dados do cliente. O erro foi reportado.");
     }
 }
 
@@ -2594,7 +2600,8 @@ async function handleAddProduct(event) {
         renderInventoryManagement();
     } catch (error) {
         console.error("Erro ao adicionar produto:", error);
-        showModal('Erro de Base de Dados', 'Não foi possível guardar o produto.');
+        logErrorToFirestore(error, 'handleAddProduct');
+        showModal('Erro de Base de Dados', 'Não foi possível guardar o produto. O erro foi reportado.');
     }
 }
 
@@ -2617,7 +2624,8 @@ async function updateProductStock(productId, quantityToAdd) {
         }
     } catch (error) {
         console.error("Erro ao atualizar estoque:", error);
-        showModal('Erro de Base de Dados', 'Não foi possível atualizar o estoque do produto.');
+        logErrorToFirestore(error, 'updateProductStock');
+        showModal('Erro de Base de Dados', 'Não foi possível atualizar o estoque do produto. O erro foi reportado.');
     }
 }
 
@@ -2742,6 +2750,21 @@ function onInventoryScanSuccess(decodedText) {
 // --- INICIALIZAÇÃO E EVENTOS ---
 // --- INICIALIZAÇÃO E EVENTOS ---
 document.addEventListener('DOMContentLoaded', () => {
+    // --- GUARDIÃO GLOBAL DE ERROS (dentro do DOMContentLoaded) ---
+    // Captura erros não tratados em qualquer parte do código.
+    window.addEventListener('error', (event) => {
+        console.error('Erro global capturado:', event.error);
+        logErrorToFirestore(event.error, 'window.onerror');
+    });
+
+    // Captura rejeições de Promises não tratadas (comum com async/await).
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('Rejeição de Promise não tratada:', event.reason);
+        if (event.reason instanceof Error) {
+            logErrorToFirestore(event.reason, 'unhandledrejection');
+        }
+    });
+
     // --- Listeners Estáticos (sempre na página) ---
     loginForm.addEventListener('submit', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
