@@ -1374,7 +1374,7 @@ async function handleOpenDay(event) {
         return;
     }
 
-    const initialCash = parseFloat(document.getElementById('initial-cash').value);
+    const initialCash = parseCurrency(document.getElementById('initial-cash').value);
     const openedBy = document.getElementById('opening-user').value;
     if (isNaN(initialCash) || initialCash < 0) {
         showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
@@ -1775,7 +1775,7 @@ async function handleUpdateCustomer() {
 
     const name = document.getElementById('edit-customer-name').value.trim();
     const phone = document.getElementById('edit-customer-phone').value.trim();
-    const debt = parseFloat(document.getElementById('edit-customer-debt').value) || 0;
+    const debt = parseCurrency(document.getElementById('edit-customer-debt').value) || 0;
 
     try {
         await updateDoc(customerRef, { name, phone, debt });
