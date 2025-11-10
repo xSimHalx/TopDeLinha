@@ -109,6 +109,12 @@ export const parseCurrency = (value) => {
 
 
 };
+
+export const isPaymentSufficient = (saleTotal, totalPaid) => {
+    // Retorna true se o pagamento for suficiente, considerando uma tolerância para erros de ponto flutuante
+    return totalPaid >= (saleTotal - 0.009);
+};
+
 const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 window.showModal = function (title, message, warningMessage = '') {
@@ -2023,9 +2029,8 @@ function updateSaleConfirmationButton() {
     if (selectedPaymentMethod === 'Fiado') {
         saleCanBeConfirmed = customerSelect.value !== '1';
     } else {
-        // Usa uma tolerância para comparações de ponto flutuante
         const amountInInput = parseCurrency(document.getElementById('payment-amount').value) || 0;
-        saleCanBeConfirmed = (totalPaid + amountInInput) >= (total - 0.009);
+        saleCanBeConfirmed = isPaymentSufficient(total, totalPaid + amountInInput);
     }
     confirmSaleButton.disabled = !saleCanBeConfirmed;
 }
@@ -2148,7 +2153,7 @@ async function confirmSale() {
             const saleTotal = saleInProgress.total;
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
 
-            if (totalPaid < saleTotal) {
+            if (!isPaymentSufficient(saleTotal, totalPaid)) {
                 showModal('Erro', 'O valor pago é insuficiente.');
                 confirmButton.disabled = false;
                 confirmButton.textContent = 'Confirmar Venda';
