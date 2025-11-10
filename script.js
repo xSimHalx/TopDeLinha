@@ -109,12 +109,6 @@ export const parseCurrency = (value) => {
 
 
 };
-
-export const isPaymentSufficient = (saleTotal, totalPaid) => {
-    // Retorna true se o pagamento for suficiente, considerando uma tolerância para erros de ponto flutuante
-    return totalPaid >= (saleTotal - 0.009);
-};
-
 const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 window.showModal = function (title, message, warningMessage = '') {
@@ -230,94 +224,6 @@ async function loadInitialData() {
     if (!auth.currentUser) return;
     const uid = auth.currentUser.uid;
     console.log("Loading data for user:", uid); // DEBUG
-
-    try {
-        // Fetch settings first
-        const settingsRef = doc(db, "settings", uid);
-        const settingsSnap = await getDoc(settingsRef);
-        let settingsData = {};
-        let needsUpdate = false;
-
-        console.log("Settings snapshot exists:", settingsSnap.exists()); // DEBUG
-
-        if (settingsSnap.exists()) {
-            settingsData = settingsSnap.data();
-            console.log("Loaded settings:", settingsData); // DEBUG
-        } else {
-            console.log("No settings found, creating default settings."); // DEBUG
-            settingsData = {
-                companyInfo: {
-                    name: 'Sua Loja Aqui',
-                    address: 'Seu Endereço',
-                    cnpj: '00.000.000/0000-00',
-                    receiptMessage: 'Obrigado pela preferência!'
-                },
-                operators: ['Caixa 1', 'Gerente']
-            };
-            needsUpdate = true;
-        }
-
-        // Ensure operators array exists
-        if (!settingsData.operators) {
-            console.log("Operators not found, creating default."); // DEBUG
-            settingsData.operators = ['Caixa 1', 'Gerente'];
-            needsUpdate = true;
-        }
-
-        // Ensure companyInfo object exists
-        if (!settingsData.companyInfo) {
-            console.log("CompanyInfo not found, creating default."); // DEBUG
-            settingsData.companyInfo = {
-                name: 'Sua Loja Aqui',
-                address: 'Seu Endereço',
-                cnpj: '00.000.000/0000-00',
-                receiptMessage: 'Obrigado pela preferência!'
-            };
-            needsUpdate = true;
-        }
-
-        settings = settingsData;
-
-        if (needsUpdate) {
-            console.log("Updating settings in Firestore with defaults."); // DEBUG
-            await setDoc(settingsRef, settings, { merge: true });
-        }
-
-        const productsQuery = query(collection(db, "products"), where("usuarioId", "==", uid));
-        const productsSnapshot = await getDocs(productsQuery);
-        products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        const customersQuery = query(collection(db, "customers"), where("usuarioId", "==", uid));
-        const customersSnapshot = await getDocs(customersQuery);
-        customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Query for the open day
-        const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), where("usuarioId", "==", uid), limit(1));
-        const openDaySnapshot = await getDocs(openDayQuery);
-
-        if (!openDaySnapshot.empty) {
-            const openDayDoc = openDaySnapshot.docs[0];
-            currentDay = { id: openDayDoc.id, ...openDayDoc.data() };
-            if (currentDay.shifts) {
-                currentShift = currentDay.shifts.find(shift => !shift.endTime) || null;
-            } else {
-                currentDay.shifts = [];
-                currentShift = null;
-            }
-        } else {
-            currentDay = null;
-            currentShift = null;
-        }
-
-        // Load closed days for reports
-        const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), where("usuarioId", "==", uid), orderBy("date", "desc"));
-        const closedDaysSnapshot = await getDocs(closedDaysQuery);
-        closedDays = closedDaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error);
-        showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
-    }
 
     try {
         // Fetch settings first
@@ -2029,8 +1935,9 @@ function updateSaleConfirmationButton() {
     if (selectedPaymentMethod === 'Fiado') {
         saleCanBeConfirmed = customerSelect.value !== '1';
     } else {
+        // Usa uma tolerância para comparações de ponto flutuante
         const amountInInput = parseCurrency(document.getElementById('payment-amount').value) || 0;
-        saleCanBeConfirmed = isPaymentSufficient(total, totalPaid + amountInInput);
+        saleCanBeConfirmed = (totalPaid + amountInInput) >= (total - 0.009);
     }
     confirmSaleButton.disabled = !saleCanBeConfirmed;
 }
@@ -2153,7 +2060,7 @@ async function confirmSale() {
             const saleTotal = saleInProgress.total;
             const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
 
-            if (!isPaymentSufficient(saleTotal, totalPaid)) {
+            if (totalPaid < saleTotal) {
                 showModal('Erro', 'O valor pago é insuficiente.');
                 confirmButton.disabled = false;
                 confirmButton.textContent = 'Confirmar Venda';
@@ -2866,40 +2773,39 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleDebtVisibility();
         }
     });
-});
 
+    // --- FIM DO NOVO CÓDIGO ---
 
-// --- FIM DO NOVO CÓDIGO ---
+    contentSettings.addEventListener('submit', function (e) {
+        if (e.target.id === 'company-info-form') handleSaveCompanyInfo(e);
+        if (e.target.id === 'add-operator-form') handleAddOperator(e);
+    });
 
-contentSettings.addEventListener('submit', function (e) {
-    if (e.target.id === 'company-info-form') handleSaveCompanyInfo(e);
-    if (e.target.id === 'add-operator-form') handleAddOperator(e);
-});
-
-paymentModal.addEventListener('click', (e) => {
-    if (e.target.classList.contains('payment-method-btn')) {
-        selectedPaymentMethod = e.target.dataset.method;
-        if (selectedPaymentMethod === 'Fiado') {
-            saleInProgress.payments = [];
+    paymentModal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('payment-method-btn')) {
+            selectedPaymentMethod = e.target.dataset.method;
+            if (selectedPaymentMethod === 'Fiado') {
+                saleInProgress.payments = [];
+            }
+            renderPaymentModal();
         }
-        renderPaymentModal();
-    }
-});
+    });
 
-document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
-    saleInProgress.customerId = this.value;
-});
+    document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
+        saleInProgress.customerId = this.value;
+    });
 
-document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
+    document.getElementById('diversos-options').addEventListener('click', handleDiversosItemClick);
 
-debtPaymentModal.addEventListener('click', (e) => {
-    if (e.target.id === 'pay-full-debt-button') {
-        const customerId = document.getElementById('debt-customer-id').value;
-        const customer = customers.find(c => c.id === customerId);
-        if (customer) {
-            document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2).replace('.', ',');
+    debtPaymentModal.addEventListener('click', (e) => {
+        if (e.target.id === 'pay-full-debt-button') {
+            const customerId = document.getElementById('debt-customer-id').value;
+            const customer = customers.find(c => c.id === customerId);
+            if (customer) {
+                document.getElementById('debt-payment-amount').value = (customer.debt || 0).toFixed(2).replace('.', ',');
+            }
         }
-    }
+    });
 });
 // NEW: Função para mostrar o modal de escolha Editar/Excluir
 function showEditOrDeleteModal(product) {

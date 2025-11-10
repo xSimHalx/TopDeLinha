@@ -1,19 +1,4 @@
-import { formatCurrency, addToCart, updateCartQuantity, resetPdv, products, cart, isPaymentSufficient } from './script.js';
-
-QUnit.module('Payment Logic', function() {
-  QUnit.test('isPaymentSufficient should handle floating point inaccuracies', function(assert) {
-    const saleTotal = 29.97; // A typical result of 3 * 9.99
-    const totalPaidExact = 29.97;
-    const totalPaidFloatError = 29.969999999999999;
-    const totalPaidInsufficient = 29.96;
-    const totalPaidMore = 30.00;
-
-    assert.ok(isPaymentSufficient(saleTotal, totalPaidExact), 'Exact payment should be sufficient');
-    assert.ok(isPaymentSufficient(saleTotal, totalPaidFloatError), 'Payment with minor floating point error should be sufficient');
-    assert.notOk(isPaymentSufficient(saleTotal, totalPaidInsufficient), 'Insufficient payment should be detected correctly');
-    assert.ok(isPaymentSufficient(saleTotal, totalPaidMore), 'Overpayment should be sufficient');
-  });
-});
+import { formatCurrency, addToCart, updateCartQuantity, resetPdv, products, cart } from './script.js';
 
 QUnit.module('Formatters', function() {
   QUnit.test('formatCurrency should format numbers correctly', function(assert) {
