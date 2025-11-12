@@ -40,6 +40,8 @@ let html5QrcodeScanner = null;
 let selectedCustomerForPayment = null;
 let areDebtsVisible = true; // Controla a visibilidade dos valores de dívida
 let selectedCustomerForSale = '1'; // Mantém o cliente selecionado entre as vendas
+let activityLogCache = [];
+let isActivityLogStale = true;
 
 
 // --- ELEMENTOS DO DOM ---
@@ -312,94 +314,6 @@ async function loadInitialData() {
         console.error("Erro ao carregar dados iniciais:", error);
         showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
     }
-
-    try {
-        // Fetch settings first
-        const settingsRef = doc(db, "settings", uid);
-        const settingsSnap = await getDoc(settingsRef);
-        let settingsData = {};
-        let needsUpdate = false;
-
-        console.log("Settings snapshot exists:", settingsSnap.exists()); // DEBUG
-
-        if (settingsSnap.exists()) {
-            settingsData = settingsSnap.data();
-            console.log("Loaded settings:", settingsData); // DEBUG
-        } else {
-            console.log("No settings found, creating default settings."); // DEBUG
-            settingsData = {
-                companyInfo: {
-                    name: 'Sua Loja Aqui',
-                    address: 'Seu Endereço',
-                    cnpj: '00.000.000/0000-00',
-                    receiptMessage: 'Obrigado pela preferência!'
-                },
-                operators: ['Caixa 1', 'Gerente']
-            };
-            needsUpdate = true;
-        }
-
-        // Ensure operators array exists
-        if (!settingsData.operators) {
-            console.log("Operators not found, creating default."); // DEBUG
-            settingsData.operators = ['Caixa 1', 'Gerente'];
-            needsUpdate = true;
-        }
-
-        // Ensure companyInfo object exists
-        if (!settingsData.companyInfo) {
-            console.log("CompanyInfo not found, creating default."); // DEBUG
-            settingsData.companyInfo = {
-                name: 'Sua Loja Aqui',
-                address: 'Seu Endereço',
-                cnpj: '00.000.000/0000-00',
-                receiptMessage: 'Obrigado pela preferência!'
-            };
-            needsUpdate = true;
-        }
-
-        settings = settingsData;
-
-        if (needsUpdate) {
-            console.log("Updating settings in Firestore with defaults."); // DEBUG
-            await setDoc(settingsRef, settings, { merge: true });
-        }
-
-        const productsQuery = query(collection(db, "products"), where("usuarioId", "==", uid));
-        const productsSnapshot = await getDocs(productsQuery);
-        products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        const customersQuery = query(collection(db, "customers"), where("usuarioId", "==", uid));
-        const customersSnapshot = await getDocs(customersQuery);
-        customers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Query for the open day
-        const openDayQuery = query(collection(db, "operating_days"), where("status", "==", "open"), where("usuarioId", "==", uid), limit(1));
-        const openDaySnapshot = await getDocs(openDayQuery);
-
-        if (!openDaySnapshot.empty) {
-            const openDayDoc = openDaySnapshot.docs[0];
-            currentDay = { id: openDayDoc.id, ...openDayDoc.data() };
-            if (currentDay.shifts) {
-                currentShift = currentDay.shifts.find(shift => !shift.endTime) || null;
-            } else {
-                currentDay.shifts = [];
-                currentShift = null;
-            }
-        } else {
-            currentDay = null;
-            currentShift = null;
-        }
-
-        // Load closed days for reports
-        const closedDaysQuery = query(collection(db, "operating_days"), where("status", "==", "closed"), where("usuarioId", "==", uid), orderBy("date", "desc"));
-        const closedDaysSnapshot = await getDocs(closedDaysQuery);
-        closedDays = closedDaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error);
-        showModal("Erro de Conexão", "Não foi possível carregar os dados da base de dados. Verifique a sua conexão e as regras de segurança do Firestore.");
-    }
 }
 
 // --- LOG DE ATIVIDADES ---
@@ -413,6 +327,7 @@ async function logActivity(type, details, user = 'Sistema') {
             details,
             usuarioId: auth.currentUser.uid
         });
+        isActivityLogStale = true; // Invalida o cache
     } catch (error) {
         console.error("Erro ao registrar atividade no log:", error);
         showModal("Erro de Log", "Não foi possível registrar a atividade. Verifique a sua conexão ou as regras do Firestore.");
@@ -1060,25 +975,21 @@ async function renderActivityTab() {
 
     if (!auth.currentUser) return;
     const uid = auth.currentUser.uid;
+    const container = document.getElementById('activities-list-container');
 
-    try {
-        const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "desc"), limit(300));
-        const logSnapshot = await getDocs(q);
-        const logs = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        const container = document.getElementById('activities-list-container');
+    const displayLogs = (logs) => {
         if (logs.length === 0) {
             container.innerHTML = '<p class="text-gray-500">Nenhuma atividade registrada ainda.</p>';
             return;
         }
 
-        // Agrupa por dia
         const logsByDay = {};
         logs.forEach(log => {
             const dia = formatDateTime(log.timestamp).split(' ')[0];
             if (!logsByDay[dia]) logsByDay[dia] = [];
             logsByDay[dia].push(log);
         });
+
         let html = '';
         Object.keys(logsByDay).forEach(dia => {
             html += `<h4 class="mt-6 mb-2 text-lg font-bold text-gray-700">${dia}</h4>`;
@@ -1138,44 +1049,57 @@ async function renderActivityTab() {
             }).join('');
         });
         container.innerHTML = html;
-        // Filtro por texto
-        document.getElementById('activity-search-input').addEventListener('input', function (e) {
-            const val = e.target.value.toLowerCase();
-            const logs = container.querySelectorAll('div.border-b');
-            logs.forEach(log => {
-                if (log.textContent.toLowerCase().includes(val)) {
-                    log.style.display = '';
-                } else {
-                    log.style.display = 'none';
-                }
-            });
-        });
-        // Filtro rápido para hoje
-        window.filterActivitiesHoje = function () {
-            const hoje = new Date();
-            const yyyy = hoje.getFullYear();
-            const mm = String(hoje.getMonth() + 1).padStart(2, '0');
-            const dd = String(hoje.getDate()).padStart(2, '0');
-            const dataHoje = `${dd}/${mm}/${yyyy}`;
-            const logs = container.querySelectorAll('div.border-b');
-            logs.forEach(log => {
-                if (log.textContent.includes(dataHoje)) {
-                    log.style.display = '';
-                } else {
-                    log.style.display = 'none';
-                }
-            });
-        };
-        window.clearActivityFilters = function () {
-            document.getElementById('activity-search-input').value = '';
-            const logs = container.querySelectorAll('div.border-b');
-            logs.forEach(log => log.style.display = '');
-        };
+    };
 
-    } catch (error) {
-        console.error("Erro ao carregar log de atividades:", error);
-        document.getElementById('activities-list-container').innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
+    if (isActivityLogStale) {
+        try {
+            const q = query(collection(db, "activity_log"), where("usuarioId", "==", uid), orderBy("timestamp", "desc"), limit(300));
+            const logSnapshot = await getDocs(q);
+            activityLogCache = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            isActivityLogStale = false;
+            displayLogs(activityLogCache);
+        } catch (error) {
+            console.error("Erro ao carregar log de atividades:", error);
+            container.innerHTML = '<p class="text-red-500">Erro ao carregar atividades.</p>';
+        }
+    } else {
+        displayLogs(activityLogCache);
     }
+
+    // Filtro por texto
+    document.getElementById('activity-search-input').addEventListener('input', function (e) {
+        const val = e.target.value.toLowerCase();
+        const logs = container.querySelectorAll('div.border-b');
+        logs.forEach(log => {
+            if (log.textContent.toLowerCase().includes(val)) {
+                log.style.display = '';
+            } else {
+                log.style.display = 'none';
+            }
+        });
+    });
+
+    // Filtro rápido para hoje
+    window.filterActivitiesHoje = function () {
+        const hoje = new Date();
+        const yyyy = hoje.getFullYear();
+        const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoje.getDate()).padStart(2, '0');
+        const dataHoje = `${dd}/${mm}/${yyyy}`;
+        const logs = container.querySelectorAll('div.border-b');
+        logs.forEach(log => {
+            if (log.textContent.includes(dataHoje)) {
+                log.style.display = '';
+            } else {
+                log.style.display = 'none';
+            }
+        });
+    };
+    window.clearActivityFilters = function () {
+        document.getElementById('activity-search-input').value = '';
+        const logs = container.querySelectorAll('div.border-b');
+        logs.forEach(log => log.style.display = '');
+    };
 }
 
 
@@ -1280,6 +1204,8 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
         switch (log.type) {
             case 'PRODUTO_ADICIONADO':
                 await deleteDoc(doc(db, "products", log.details.productId));
+                const pIndex = products.findIndex(p => p.id === log.details.productId);
+                if (pIndex > -1) products.splice(pIndex, 1);
                 showModal('Ação Desfeita', `O produto "${log.details.name}" foi apagado.`);
                 await logActivity('PRODUTO_DESFEITO', {
                     originalLogId: log.id,
@@ -1295,6 +1221,7 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
                 if (productToUpdate) {
                     const revertedStock = productToUpdate.stock - log.details.quantityAdded;
                     await updateDoc(productRef, { stock: revertedStock });
+                    productToUpdate.stock = revertedStock;
                     showModal('Ação Desfeita', `O estoque de "${log.details.productName}" foi revertido para ${revertedStock}.`);
                     await logActivity('ESTOQUE_DESFEITO', {
                         originalLogId: log.id,
@@ -1310,6 +1237,8 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
 
             case 'CLIENTE_ADICIONADO':
                 await deleteDoc(doc(db, "customers", log.details.customerId));
+                const cIndex = customers.findIndex(c => c.id === log.details.customerId);
+                if (cIndex > -1) customers.splice(cIndex, 1);
                 showModal('Ação Desfeita', `O cliente "${log.details.name}" foi apagado.`);
                 await logActivity('CLIENTE_DESFEITO', {
                     originalLogId: log.id,
@@ -1326,7 +1255,6 @@ Tipo: ${log.type.replace(/_/g, ' ')}`)) {
         const logRef = doc(db, "activity_log", log.id);
         await updateDoc(logRef, { undone: true });
 
-        await loadInitialData();
         renderAll();
         changeTab('activities');
 
@@ -1421,7 +1349,6 @@ async function handleOpenShift(event, user) {
 }
 
 async function handleCloseShift() {
-    await loadInitialData(); // Ensure currentDay is up-to-date
     if (!currentShift) return;
     const closedBy = document.getElementById('closing-user').value;
 
@@ -1431,9 +1358,9 @@ async function handleCloseShift() {
         shiftInDay.closedBy = closedBy;
     }
 
-    currentShift = null;
-
     await updateCurrentDayInFirestore();
+
+    currentShift = null;
     await logActivity('TURNO_FECHADO', {
         shiftId: shiftInDay.id,
         startTime: shiftInDay.startTime,
@@ -1448,7 +1375,6 @@ async function handleCloseShift() {
 }
 
 async function handleCloseDay() {
-    await loadInitialData(); // Ensure currentDay is up-to-date
     if (!currentDay || currentShift) {
         showModal('Ação Inválida', 'Feche o turno atual antes de fechar o dia.');
         return;
@@ -1461,9 +1387,11 @@ async function handleCloseDay() {
         const shiftToLog = currentShift ? { ...currentShift } : null; // Create a copy if exists
 
         await updateCurrentDayInFirestore();
+
+        // Atualiza o estado local em vez de recarregar tudo
+        closedDays.unshift(dayToLog);
         currentDay = null;
         currentShift = null;
-        await loadInitialData();
 
         await logActivity('DIA_FECHADO', {
             dayId: dayToLog.id,
@@ -1481,7 +1409,8 @@ async function handleCloseDay() {
     } catch (error) {
         console.error("Erro ao fechar o dia:", error);
         showModal("Erro de Base de Dados", `Não foi possível salvar o relatório do dia. Por favor, tente novamente. Detalhes: ${error.message || error}`);
-        if (currentDay) { // Only revert status if currentDay is not null
+        // Reverte a mudança de estado local em caso de erro
+        if (currentDay) {
             currentDay.status = 'open';
         }
     }
@@ -1671,32 +1600,19 @@ window.closeDebtPaymentModal = function () {
 // Versão atualizada para o modal da lista de clientes
 async function handleConfirmDebtPayment() {
     const customerId = document.getElementById('debt-customer-id').value;
+    const customer = customers.find(c => c.id === customerId);
 
-    // --- MUDANÇA IMPORTANTE AQUI ---
-    // Em vez de usar a variável local, buscamos os dados mais recentes do cliente do Firestore
-    try {
-        const customerRef = doc(db, "customers", customerId);
-        const customerSnap = await getDoc(customerRef);
-
-        if (!customerSnap.exists()) {
-            showModal('Erro', 'Cliente não encontrado na base de dados.');
-            return;
-        }
-
-        const customer = { id: customerSnap.id, ...customerSnap.data() }; // Objeto do cliente 100% atualizado
-
-        const amountPaid = parseCurrency(document.getElementById('debt-payment-amount').value);
-        const method = document.getElementById('debt-payment-method').value;
-
-        // Chamamos a nossa função central com os dados frescos da base de dados
-        await processDebtPayment(customer, amountPaid, method);
-
-        closeDebtPaymentModal();
-
-    } catch (error) {
-        console.error("Erro ao buscar cliente ou processar pagamento:", error);
-        showModal('Erro', 'Não foi possível completar a operação.');
+    if (!customer) {
+        showModal('Erro', 'Cliente não encontrado localmente.');
+        return;
     }
+
+    const amountPaid = parseCurrency(document.getElementById('debt-payment-amount').value);
+    const method = document.getElementById('debt-payment-method').value;
+
+    await processDebtPayment(customer, amountPaid, method);
+
+    closeDebtPaymentModal();
 }
 
 window.openEditCustomerModal = function (customerId) {
