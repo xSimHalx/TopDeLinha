@@ -9,3 +9,6 @@ __pycache__/
 
 # Windows
 Thumbs.db
+
+# Node
+node_modules/

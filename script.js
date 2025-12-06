@@ -66,6 +66,7 @@ const receiptModal = document.getElementById('receipt-modal');
 const diversosModal = document.getElementById('diversos-modal');
 
 
+import { formatCurrency, parseCurrency, calculateCartTotal } from './pdv_logic.js';
 // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
 function debounce(func, delay = 400) {
     let timeout;
@@ -74,41 +75,6 @@ function debounce(func, delay = 400) {
         timeout = setTimeout(() => { func.apply(this, args); }, delay);
     };
 }
-export const formatCurrency = (value) => {
-    // Garante que o valor é um número antes de formatar
-    if (typeof value !== 'number') {
-        value = Number(value) || 0;
-    }
-    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-};
-export const parseCurrency = (value) => {
-    if (typeof value !== 'string') {
-        return Number(value) || 0;
-    }
-
-    // Remove tudo exceto dígitos, pontos e vírgulas
-    let cleaned = value.replace(/[^0-9.,]/g, '');
-
-    // Verifica qual é o último separador: ponto ou vírgula
-    const lastComma = cleaned.lastIndexOf(',');
-    const lastDot = cleaned.lastIndexOf('.');
-
-    // Se a vírgula for o último separador (formato pt-BR: 1.234,56)
-    if (lastComma > lastDot) {
-        // Remove os pontos (milhares) e troca a vírgula (decimal) por ponto
-        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    }
-    // Se o ponto for o último separador (formato US: 1,234.56) ou se não houver vírgula
-    else if (lastDot > lastComma) {
-        // Apenas remove as vírgulas (milhares)
-        cleaned = cleaned.replace(/,/g, '');
-    }
-    // Se não houver separadores, não faz nada.
-
-    return parseFloat(cleaned) || 0;
-
-
-};
 const formatDateTime = (date) => new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 window.showModal = function (title, message, warningMessage = '') {
@@ -1374,7 +1340,7 @@ async function handleOpenDay(event) {
         return;
     }
 
-    const initialCash = parseFloat(document.getElementById('initial-cash').value);
+    const initialCash = parseCurrency(document.getElementById('initial-cash').value);
     const openedBy = document.getElementById('opening-user').value;
     if (isNaN(initialCash) || initialCash < 0) {
         showModal('Valor Inválido', 'Por favor, insira um valor inicial válido.');
@@ -1566,7 +1532,7 @@ async function handleAddManualDebt(event) {
     const customer = customers.find(c => c.id === customerId);
     if (!customer) return;
 
-    const newDebt = parseFloat((customer.debt + amount).toFixed(2));
+    const newDebt = currency(customer.debt, BRLConfig).add(amount).value;
 
     try {
         const customerRef = doc(db, "customers", customerId);
@@ -1775,7 +1741,7 @@ async function handleUpdateCustomer() {
 
     const name = document.getElementById('edit-customer-name').value.trim();
     const phone = document.getElementById('edit-customer-phone').value.trim();
-    const debt = parseFloat(document.getElementById('edit-customer-debt').value) || 0;
+    const debt = parseCurrency(document.getElementById('edit-customer-debt').value) || 0;
 
     try {
         await updateDoc(customerRef, { name, phone, debt });
@@ -1911,11 +1877,12 @@ function renderCart() {
     } else {
         cartItemsEl.innerHTML = '';
         cart.forEach(item => {
+            const itemTotal = currency(item.price).multiply(item.quantity);
             cartItemsEl.innerHTML += `
                         <div class="flex items-center mb-3 p-2 bg-white rounded-lg shadow-sm">
                             <div class="flex-grow">
                                 <p class="font-semibold">${item.name}</p>
-                                <p class="text-sm text-gray-500">${formatCurrency(item.price)} x ${item.quantity} = ${formatCurrency(item.price * item.quantity)}</p>
+                                <p class="text-sm text-gray-500">${formatCurrency(item.price)} x ${item.quantity} = ${formatCurrency(itemTotal.value)}</p>
                             </div>
                             <div class="flex items-center">
                                 <button onclick="updateCartQuantity('${item.sku}', -1)" class="w-8 h-8 bg-gray-200 rounded-full font-bold text-lg">-</button>
@@ -1927,8 +1894,8 @@ function renderCart() {
         });
         checkoutButton.disabled = false;
     }
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    cartTotalEl.textContent = formatCurrency(total);
+    const total = calculateCartTotal(cart);
+    cartTotalEl.textContent = total.format();
 }
 
 window.updateCartQuantity = function (sku, change) {
@@ -1963,9 +1930,10 @@ window.removeFromCart = function (sku) {
 
 function handleCheckout() {
     if (cart.length === 0) return;
+    const total = calculateCartTotal(cart);
     saleInProgress = {
         items: JSON.parse(JSON.stringify(cart)),
-        total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        total: total.value, // Armazena o valor numérico
         payments: [],
         customerId: selectedCustomerForSale,
     };
@@ -1978,13 +1946,13 @@ function handleCheckout() {
 //alteraçao de logica
 
 function renderPaymentModal() {
-    const total = parseFloat(saleInProgress.total.toFixed(2));
-    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
-    const change = totalPaid > total ? totalPaid - total : 0;
+    const total = currency(saleInProgress.total);
+    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum.add(p.amount), currency(0));
+    const change = totalPaid.value > total.value ? totalPaid.subtract(total) : currency(0);
 
-    document.getElementById('payment-modal-total').textContent = formatCurrency(total);
-    document.getElementById('payment-modal-paid-amount').textContent = formatCurrency(totalPaid);
-    document.getElementById('payment-modal-change').textContent = formatCurrency(change);
+    document.getElementById('payment-modal-total').textContent = formatCurrency(total.value);
+    document.getElementById('payment-modal-paid-amount').textContent = formatCurrency(totalPaid.value);
+    document.getElementById('payment-modal-change').textContent = formatCurrency(change.value);
 
     const customerSelect = document.getElementById('payment-modal-customer-select');
     const customerOptions = customers.filter(c => c.id !== '1').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -1994,9 +1962,9 @@ function renderPaymentModal() {
     document.getElementById('payment-modal-cart-summary').innerHTML = saleInProgress.items.map(i => `<div>${i.quantity}x ${i.name}</div>`).join('');
     document.getElementById('payment-modal-payments-list').innerHTML = saleInProgress.payments.map(p => `<div class="flex justify-between bg-white p-1 rounded"><span>${p.method}</span><span class="font-semibold">${formatCurrency(p.amount)}</span></div>`).join('');
 
-    const remainingAmount = total - totalPaid;
-    // Preenche o campo com o valor restante (com uma pequena tolerância para evitar bugs de arredondamento)
-    document.getElementById('payment-amount').value = (remainingAmount > 0.009) ? remainingAmount.toFixed(2).replace('.', ',') : '';
+    const remainingAmount = total.subtract(totalPaid);
+    // Preenche o campo com o valor restante
+    document.getElementById('payment-amount').value = (remainingAmount.value > 0) ? remainingAmount.value.toFixed(2).replace('.', ',') : '';
 
     // Chama a nova função para cuidar apenas do botão
     updateSaleConfirmationButton();
@@ -2014,8 +1982,8 @@ function renderPaymentModal() {
 
 //19/09 - responsável apenas por habilitar ou desabilitar o botão "Confirmar Venda".
 function updateSaleConfirmationButton() {
-    const total = parseFloat(saleInProgress.total.toFixed(2));
-    const totalPaid = parseFloat(saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
+    const total = currency(saleInProgress.total);
+    const totalPaid = saleInProgress.payments.reduce((sum, p) => sum.add(p.amount), currency(0));
     const customerSelect = document.getElementById('payment-modal-customer-select');
     const confirmSaleButton = document.getElementById('confirm-sale-button');
 
@@ -2023,9 +1991,10 @@ function updateSaleConfirmationButton() {
     if (selectedPaymentMethod === 'Fiado') {
         saleCanBeConfirmed = customerSelect.value !== '1';
     } else {
-        // Usa uma tolerância para comparações de ponto flutuante
-        const amountInInput = parseCurrency(document.getElementById('payment-amount').value) || 0;
-        saleCanBeConfirmed = (totalPaid + amountInInput) >= (total - 0.009);
+        // Usa a biblioteca para evitar erros de ponto flutuante na comparação
+        const amountInInput = currency(parseCurrency(document.getElementById('payment-amount').value) || 0);
+        const finalPaidAmount = totalPaid.add(amountInInput);
+        saleCanBeConfirmed = finalPaidAmount.value >= total.value;
     }
     confirmSaleButton.disabled = !saleCanBeConfirmed;
 }
@@ -2133,7 +2102,7 @@ async function confirmSale() {
             }
 
             if (customer) {
-                const newDebtAmount = parseFloat((customer.debt + fiadoPayment.amount).toFixed(2));
+                const newDebtAmount = currency(customer.debt).add(fiadoPayment.amount).value;
                 const customerRef = doc(db, "customers", customerId);
                 await updateDoc(customerRef, { debt: newDebtAmount });
                 customer.debt = newDebtAmount;
@@ -2145,19 +2114,19 @@ async function confirmSale() {
                 saleData.notes = `Venda fiado para o cliente ${customer.name}.`;
             }
         } else {
-            const saleTotal = saleInProgress.total;
-            const totalPaid = saleInProgress.payments.reduce((sum, p) => sum + p.amount, 0);
+            const saleTotal = currency(saleInProgress.total);
+            const totalPaid = saleInProgress.payments.reduce((sum, p) => sum.add(p.amount), currency(0));
 
-            if (totalPaid < saleTotal) {
+            if (totalPaid.value < saleTotal.value) {
                 showModal('Erro', 'O valor pago é insuficiente.');
                 confirmButton.disabled = false;
                 confirmButton.textContent = 'Confirmar Venda';
                 return;
             }
 
-            if (totalPaid > saleTotal) {
-                const change = totalPaid - saleTotal;
-                saleData.change = change;
+            if (totalPaid.value > saleTotal.value) {
+                const change = totalPaid.subtract(saleTotal);
+                saleData.change = change.value; // Armazena o valor numérico
             }
         }
 
@@ -2742,6 +2711,11 @@ function onInventoryScanSuccess(decodedText) {
 // --- INICIALIZAÇÃO E EVENTOS ---
 // --- INICIALIZAÇÃO E EVENTOS ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Expose for testing
+    window.addToCart = addToCart;
+    window.renderPdvTab = renderPdvTab;
+    window.products = products;
+
     // --- Listeners Estáticos (sempre na página) ---
     loginForm.addEventListener('submit', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
@@ -3047,8 +3021,8 @@ async function processDebtPayment(customer, amountPaid, method) {
     }
 
     const amountToClear = Math.min(amountPaid, debt);
-    const newDebt = parseFloat((debt - amountToClear).toFixed(2));
-    const change = parseFloat((amountPaid > debt ? amountPaid - debt : 0).toFixed(2));
+    const newDebt = currency(debt).subtract(amountToClear).value;
+    const change = (amountPaid > debt) ? currency(amountPaid).subtract(debt).value : 0;
 
     try {
         const customerRef = doc(db, "customers", customer.id);
