@@ -1145,24 +1145,176 @@ async function renderActivityTab() {
 }
 
 
+// --- FUNÇÕES DE EXPORTAÇÃO (MIGRAÇÃO) ---
+
+function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function fetchAllData(collectionName, isSubCollection = false) {
+    if (!auth.currentUser) return [];
+    const uid = auth.currentUser.uid;
+    let results = [];
+
+    try {
+        let q;
+        if (isSubCollection) {
+            // Ex: users/{uid}/sales
+            const colRef = collection(db, "users", uid, collectionName);
+            q = query(colRef);
+        } else {
+            // Ex: products where usuarioId == uid
+            const colRef = collection(db, collectionName);
+            q = query(colRef, where("usuarioId", "==", uid));
+        }
+
+        const querySnapshot = await getDocs(q);
+        results = querySnapshot.docs.map(doc => ({
+            _firestore_id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error(`Erro ao exportar ${collectionName}:`, error);
+        showModal('Erro de Exportação', `Não foi possível exportar os dados de ${collectionName}.`);
+        throw error;
+    }
+    return results;
+}
+
+window.handleExport = async function(type) {
+    const btn = document.getElementById(`export-btn-${type}`);
+    const originalText = btn ? btn.innerText : '';
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Exportando...`;
+    }
+
+    try {
+        let data = [];
+        let filename = '';
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+        switch (type) {
+            case 'products':
+                data = await fetchAllData('products');
+                filename = `produtos_${timestamp}.json`;
+                break;
+            case 'customers':
+                data = await fetchAllData('customers');
+                filename = `clientes_${timestamp}.json`;
+                break;
+            case 'sales':
+                data = await fetchAllData('sales', true);
+                filename = `historico_vendas_${timestamp}.json`;
+                break;
+            case 'debt_history':
+                data = await fetchAllData('debt_history', true);
+                filename = `historico_dividas_${timestamp}.json`;
+                break;
+            case 'operating_days':
+                data = await fetchAllData('operating_days');
+                filename = `dias_turnos_${timestamp}.json`;
+                break;
+            case 'activity_log':
+                data = await fetchAllData('activity_log');
+                filename = `logs_atividade_${timestamp}.json`;
+                break;
+            default:
+                throw new Error('Tipo de exportação desconhecido');
+        }
+
+        if (data.length > 0) {
+            downloadJSON(data, filename);
+        } else {
+            showModal('Aviso', 'Nenhum dado encontrado para exportar neste item.');
+        }
+
+    } catch (error) {
+        console.error(error);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    }
+}
+
 // NEW: Settings Tab Logic
 function renderSettingsTab() {
     if (!settings || !settings.companyInfo) return; // Wait for settings to be loaded
 
     // Populate company info form
-    document.getElementById('store-name').value = settings.companyInfo.name || '';
-    document.getElementById('store-address').value = settings.companyInfo.address || '';
-    document.getElementById('store-cnpj').value = settings.companyInfo.cnpj || '';
-    document.getElementById('store-receipt-message').value = settings.companyInfo.receiptMessage || '';
+    const storeNameInput = document.getElementById('store-name');
+    if (storeNameInput) storeNameInput.value = settings.companyInfo.name || '';
+
+    const storeAddressInput = document.getElementById('store-address');
+    if (storeAddressInput) storeAddressInput.value = settings.companyInfo.address || '';
+
+    const storeCnpjInput = document.getElementById('store-cnpj');
+    if (storeCnpjInput) storeCnpjInput.value = settings.companyInfo.cnpj || '';
+
+    const storeReceiptMessageInput = document.getElementById('store-receipt-message');
+    if (storeReceiptMessageInput) storeReceiptMessageInput.value = settings.companyInfo.receiptMessage || '';
 
     // Populate operators list
     const operatorsListEl = document.getElementById('operators-list');
-    operatorsListEl.innerHTML = settings.operators.map(op => `
+    if (operatorsListEl) {
+        operatorsListEl.innerHTML = settings.operators.map(op => `
                 <div class="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                     <span>${op}</span>
                     <button onclick="handleRemoveOperator('${op}')" class="text-red-500 hover:text-red-700 font-bold">Remover</button>
                 </div>
             `).join('');
+    }
+
+    // INJECT MIGRATION SECTION
+    const settingsGrid = document.querySelector('#content-settings .grid');
+    if (settingsGrid && !document.getElementById('migration-section')) {
+        const migrationDiv = document.createElement('div');
+        migrationDiv.id = 'migration-section';
+        migrationDiv.className = 'md:col-span-2';
+        migrationDiv.innerHTML = `
+            <h3 class="font-semibold text-xl text-gray-700 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Migração de Dados (Exportar)
+            </h3>
+            <div class="bg-indigo-50 p-6 rounded-lg shadow border border-indigo-100">
+                <p class="text-sm text-indigo-800 mb-4">Utilize os botões abaixo para baixar todos os seus dados em formato JSON. Estes arquivos podem ser usados para migrar para o Supabase ou outro sistema.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <button id="export-btn-products" onclick="handleExport('products')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        📦 Produtos
+                    </button>
+                    <button id="export-btn-customers" onclick="handleExport('customers')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        👥 Clientes
+                    </button>
+                    <button id="export-btn-sales" onclick="handleExport('sales')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        💰 Histórico de Vendas
+                    </button>
+                    <button id="export-btn-debt_history" onclick="handleExport('debt_history')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        📒 Histórico de Dívidas
+                    </button>
+                    <button id="export-btn-operating_days" onclick="handleExport('operating_days')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        📅 Dias e Turnos
+                    </button>
+                    <button id="export-btn-activity_log" onclick="handleExport('activity_log')" class="flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 font-bold py-3 px-4 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm">
+                        📋 Logs de Atividade
+                    </button>
+                </div>
+            </div>
+        `;
+        settingsGrid.appendChild(migrationDiv);
+    }
 }
 
 async function handleSaveCompanyInfo(event) {

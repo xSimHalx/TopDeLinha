@@ -71,11 +71,11 @@
         }
     </style>
 </head> 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gray-100 h-screen overflow-hidden">
 
     <!-- Ecrã de Login -->
-    <div id="login-screen" class="w-full max-w-sm">
-        <div class="bg-white p-8 rounded-xl shadow-lg">
+    <div id="login-screen" class="w-full h-full flex items-center justify-center">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
             <h2 class="text-2xl font-bold text-center text-gray-800">Acesso ao Sistema</h2>
             <p class="text-center text-gray-500 text-sm mt-2">Por favor, insira as suas credenciais.</p>
             <form id="login-form" class="mt-8 space-y-6">
@@ -98,7 +98,7 @@
     </div>
 
     <!-- Sistema Principal (inicialmente oculto) -->
-    <div id="main-app" class="w-full max-w-7xl h-[90vh] flex-col bg-white rounded-xl shadow-2xl overflow-hidden hidden">
+    <div id="main-app" class="w-full h-full flex-col bg-white overflow-hidden hidden">
         <header class="bg-gray-800 p-6 flex-shrink-0 flex justify-between items-center">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-bold text-white">Sistema Integrado de Gestão</h1>
