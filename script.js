@@ -41,6 +41,15 @@ let selectedCustomerForPayment = null;
 let areDebtsVisible = true; // Controla a visibilidade dos valores de dívida
 let selectedCustomerForSale = '1'; // Mantém o cliente selecionado entre as vendas
 
+// Variáveis para o Modal de Balança
+let isScaleModalOpen = false;
+let currentScaleValue = 0;
+let currentScaleBarcode = '';
+let scaleModalTimeout = null;
+let scaleModalWarningTimeout = null;
+let selectedScaleProductIndex = -1;
+let filteredScaleProducts = [];
+
 
 // --- ELEMENTOS DO DOM ---
 const loginScreen = document.getElementById('login-screen');
@@ -66,7 +75,7 @@ const receiptModal = document.getElementById('receipt-modal');
 const diversosModal = document.getElementById('diversos-modal');
 
 
-import { formatCurrency, parseCurrency, calculateCartTotal } from './pdv_logic.js';
+import { formatCurrency, parseCurrency, calculateCartTotal, parseScaleBarcode } from './pdv_logic.js';
 // --- FUNÇÕES DE RENDERIZAÇÃO E UTILIDADES ---
 function debounce(func, delay = 400) {
     let timeout;
@@ -674,6 +683,12 @@ function renderPdvTab() {
                             <div class="flex items-center gap-2 mt-1">
                                 <input type="text" id="product-search-input" onkeyup="handlePdvProductSearch(event)" placeholder="Digite o nome do produto..." class="block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
                                 <button id="diversos-button" class="bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-800 whitespace-nowrap">Diversos</button>
+                                <button id="scale-config-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z" clip-rule="evenodd" />
+                                    </svg>
+                                    Balança
+                                </button>
                             </div>
                             <div id="pdv-search-results" class="mt-2 max-h-40 overflow-y-auto"></div>
                         </div>
@@ -1584,6 +1599,7 @@ window.openEditProductModal = function (productId) {
     document.getElementById('edit-product-price').value = product.price.toFixed(2);
     document.getElementById('edit-product-stock').value = product.stock;
     document.getElementById('edit-product-min-stock').value = product.minStock;
+    document.getElementById('edit-product-usa-balanca').checked = product.usaBalanca || false;
 
     closeEditCustomerModal(); // Fecha o modal de cliente se estiver aberto
     document.getElementById('edit-product-modal').classList.remove('hidden');
@@ -1693,6 +1709,7 @@ async function handleUpdateProduct(event) {
     const productRef = doc(db, "products", productId);
     const updatedName = document.getElementById('edit-product-name').value.trim();
     const updatedBarcode = document.getElementById('edit-product-barcode').value.trim();
+    const updatedUsaBalanca = document.getElementById('edit-product-usa-balanca').checked;
     const updatedPrice = parseCurrency(document.getElementById('edit-product-price').value);
     const updatedStock = parseInt(document.getElementById('edit-product-stock').value);
     const updatedMinStock = parseInt(document.getElementById('edit-product-min-stock').value);
@@ -1718,7 +1735,8 @@ async function handleUpdateProduct(event) {
             barcode: updatedBarcode,
             price: updatedPrice,
             stock: updatedStock,
-            minStock: updatedMinStock
+            minStock: updatedMinStock,
+            usaBalanca: updatedUsaBalanca
         });
         await logActivity('PRODUTO_ATUALIZADO', { productId, name: updatedName }, currentShift ? currentShift.openedBy : 'Sistema');
         showModal('Sucesso', 'Produto atualizado com sucesso.');
@@ -1809,23 +1827,307 @@ const handleBarcodeAutoDetect = debounce((inputElement) => {
 });
 // ------------------------------------
 
+/**
+ * Exibe uma notificação rápida (toast) no canto da tela.
+ */
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return; // Segurança para testes
+    const toast = document.createElement('div');
+
+    const bgColors = {
+        info: 'bg-gray-800',
+        success: 'bg-green-600',
+        error: 'bg-red-600',
+        warning: 'bg-yellow-500'
+    };
+
+    toast.className = `${bgColors[type] || bgColors.info} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-10 opacity-0 flex items-center gap-2 min-w-[250px] pointer-events-auto`;
+    toast.innerHTML = `
+        <span class="flex-grow font-medium">${message}</span>
+        <button class="text-white hover:text-gray-200 ml-2">&times;</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Trigger animation
+    setTimeout(() => {
+        toast.classList.remove('translate-y-10', 'opacity-0');
+    }, 10);
+
+    const closeToast = () => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    };
+
+    toast.querySelector('button').onclick = closeToast;
+
+    // Auto-remove
+    setTimeout(closeToast, 4000);
+}
+
+// --- LÓGICA DO MODAL DE BALANÇA ---
+
+function openScaleSelectionModal(valor, barcode) {
+    isScaleModalOpen = true;
+    currentScaleValue = valor;
+    currentScaleBarcode = barcode;
+    selectedScaleProductIndex = 0;
+
+    const modal = document.getElementById('scale-selection-modal');
+    const valueDisplay = document.getElementById('scale-detected-value');
+    const searchInput = document.getElementById('scale-product-search');
+
+    if (valueDisplay) valueDisplay.textContent = formatCurrency(valor);
+    if (searchInput) searchInput.value = '';
+
+    if (modal) {
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
+    }
+
+    filterScaleProducts('');
+    if (searchInput) searchInput.focus();
+
+    resetScaleModalTimeout();
+}
+
+function closeScaleSelectionModal(isCancel = true) {
+    const modal = document.getElementById('scale-selection-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.querySelector('div').classList.add('scale-95');
+    }
+
+    isScaleModalOpen = false;
+    clearTimeout(scaleModalTimeout);
+    clearTimeout(scaleModalWarningTimeout);
+    const warning = document.getElementById('scale-modal-timeout-warning');
+    if (warning) warning.classList.add('hidden');
+
+    if (isCancel) {
+        showToast("Leitura de balança cancelada", "warning");
+    }
+
+    focusOnBarcode();
+}
+
+function filterScaleProducts(term) {
+    const searchTerm = term.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    filteredScaleProducts = products.filter(p => {
+        if (!p.usaBalanca) return false;
+
+        const name = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const sku = (p.sku || "").toLowerCase();
+
+        return name.includes(searchTerm) || sku.includes(searchTerm);
+    });
+
+    renderScaleProductsList();
+}
+
+function renderScaleProductsList() {
+    const list = document.getElementById('scale-products-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (filteredScaleProducts.length === 0) {
+        list.innerHTML = '<p class="text-center text-gray-400 py-10">Nenhum produto de balança encontrado.</p>';
+        selectedScaleProductIndex = -1;
+        return;
+    }
+
+    if (selectedScaleProductIndex >= filteredScaleProducts.length) {
+        selectedScaleProductIndex = filteredScaleProducts.length - 1;
+    }
+
+    filteredScaleProducts.forEach((product, index) => {
+        const isSelected = index === selectedScaleProductIndex;
+        const item = document.createElement('div');
+        item.className = `p-4 rounded-xl border-2 cursor-pointer transition-all flex justify-between items-center ${
+            isSelected ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-gray-100 hover:border-gray-300'
+        }`;
+
+        item.onclick = () => {
+            selectedScaleProductIndex = index;
+            confirmScaleSelection();
+        };
+
+        item.innerHTML = `
+            <div>
+                <p class="font-bold text-gray-800 ${isSelected ? 'text-indigo-700' : ''}">${product.name}</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">${product.sku}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Balança</span>
+                ${isSelected ? '<span class="text-indigo-600">⏎</span>' : ''}
+            </div>
+        `;
+
+        list.appendChild(item);
+        if (isSelected) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+}
+
+function confirmScaleSelection() {
+    if (selectedScaleProductIndex < 0 || selectedScaleProductIndex >= filteredScaleProducts.length) return;
+
+    const product = filteredScaleProducts[selectedScaleProductIndex];
+
+    // Lança no caixa
+    addToCart(product.sku, currentScaleValue, "balanca_valor_fechado", currentScaleBarcode);
+
+    // Auditoria
+    logActivity('BALANCA_VENDA', {
+        produtoId: product.id,
+        nome: product.name,
+        valor: currentScaleValue,
+        codigoBalanca: currentScaleBarcode,
+        origem: "balanca_valor_fechado"
+    }, currentShift ? currentShift.openedBy : 'Sistema');
+
+    closeScaleSelectionModal(false);
+    showToast(`Adicionado: ${product.name}`, "success");
+}
+
+function resetScaleModalTimeout() {
+    clearTimeout(scaleModalTimeout);
+    clearTimeout(scaleModalWarningTimeout);
+
+    const warning = document.getElementById('scale-modal-timeout-warning');
+    if (warning) warning.classList.add('hidden');
+
+    // Aviso em 20 segundos
+    scaleModalWarningTimeout = setTimeout(() => {
+        const w = document.getElementById('scale-modal-timeout-warning');
+        if (w) w.classList.remove('hidden');
+    }, 20000);
+
+    // Fechar em 30 segundos
+    scaleModalTimeout = setTimeout(() => {
+        closeScaleSelectionModal(true);
+        showToast("Modal fechado por inatividade", "info");
+    }, 30000);
+}
+
+// --- LÓGICA DO MODAL DE CONFIGURAÇÃO DE BALANÇA ---
+
+function openScaleConfigModal() {
+    const modal = document.getElementById('scale-config-modal');
+    if (modal) modal.classList.remove('hidden');
+    renderScaleConfigList();
+}
+
+function closeScaleConfigModal() {
+    const modal = document.getElementById('scale-config-modal');
+    if (modal) modal.classList.add('hidden');
+    renderAll(); // Atualiza a lista do PDV para mostrar/esconder badges
+}
+
+function renderScaleConfigList() {
+    const list = document.getElementById('scale-config-products-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const scaleProducts = products.filter(p => p.usaBalanca);
+
+    if (scaleProducts.length === 0) {
+        list.innerHTML = '<p class="text-center text-gray-500 py-4">Nenhum produto configurado para balança.</p>';
+        return;
+    }
+
+    scaleProducts.forEach(product => {
+        const item = document.createElement('div');
+        item.className = "flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200";
+        item.innerHTML = `
+            <div>
+                <p class="font-bold text-gray-800">${product.name}</p>
+                <p class="text-xs text-gray-500">SKU: ${product.sku} | Preço Base: ${formatCurrency(product.price)}</p>
+            </div>
+            <button onclick="toggleScaleProduct('${product.id}', false)" class="text-red-500 hover:text-red-700 text-sm font-bold">
+                Remover
+            </button>
+        `;
+        list.appendChild(item);
+    });
+}
+
+async function toggleScaleProduct(productId, state) {
+    try {
+        const productRef = doc(db, "products", productId);
+        await updateDoc(productRef, { usaBalanca: state });
+
+        // Atualiza localmente
+        const product = products.find(p => p.id === productId);
+        if (product) product.usaBalanca = state;
+
+        renderScaleConfigList();
+        showToast(state ? "Produto adicionado à balança" : "Produto removido da balança", "info");
+    } catch (error) {
+        console.error("Erro ao atualizar status de balança:", error);
+        showToast("Erro ao atualizar produto", "error");
+    }
+}
+
+async function handleAddScaleProduct(event) {
+    event.preventDefault();
+    if (!auth.currentUser) return;
+
+    const name = document.getElementById('scale-new-name').value.trim();
+    const sku = document.getElementById('scale-new-sku').value.trim();
+    const priceStr = document.getElementById('scale-new-price').value;
+    const price = parseCurrency(priceStr);
+
+    // Verifica se já existe
+    const existing = products.find(p => (p.sku || "").toLowerCase() === sku.toLowerCase() || (p.name || "").toLowerCase() === name.toLowerCase());
+    if (existing) {
+        if (existing.usaBalanca) {
+            showToast("Este produto já está na lista de balança", "warning");
+        } else {
+            // Se já existe no estoque mas não está na balança, apenas ativa
+            await toggleScaleProduct(existing.id, true);
+            event.target.reset();
+        }
+        return;
+    }
+
+    const newProduct = {
+        name,
+        sku,
+        price,
+        barcode: '', // Itens de balança manual geralmente não tem barcode fixo EAN-13 normal
+        stock: 999,  // Valor padrão alto para itens de balança
+        minStock: 0,
+        usaBalanca: true,
+        usuarioId: auth.currentUser.uid
+    };
+
+    try {
+        const docRef = await addDoc(collection(db, "products"), newProduct);
+        const addedProduct = { id: docRef.id, ...newProduct };
+        products.push(addedProduct);
+
+        event.target.reset();
+        renderScaleConfigList();
+        showToast("Novo item de balança adicionado!", "success");
+    } catch (error) {
+        console.error("Erro ao adicionar item de balança:", error);
+        showToast("Erro ao salvar produto", "error");
+    }
+}
+
 
 function handleBarcodeScan(scannedCode) {
+    if (isScaleModalOpen) {
+        console.log("Scanner bloqueado: Modal de balança aberto.");
+        return;
+    }
+
     // Check for scale barcode (starts with '2')
-    if (scannedCode.startsWith('2') && scannedCode.length >= 12) { // Assuming 12 digits after '2' for SKU and price
-        const skuPart = scannedCode.substring(1, 6); // Digits 1-5 for SKU
-        const pricePart = scannedCode.substring(6, 11); // Digits 6-10 for price
-        const price = parseFloat(pricePart) / 100; // Assuming last two digits are cents
-
-        const product = products.find(p => p.sku === skuPart);
-
-        if (product) {
-            // Create a temporary product object with the scanned price
-            const productWithScalePrice = { ...product, price: price };
-            addToCart(productWithScalePrice.sku, productWithScalePrice.price); // Pass price to addToCart
-        } else {
-            showModal('Produto da Balança não encontrado', `Nenhum produto corresponde ao SKU '${skuPart}' do código de balança.`);
-        }
+    const scaleData = parseScaleBarcode(scannedCode);
+    if (scaleData) {
+        openScaleSelectionModal(scaleData.valor, scaleData.codigoBalanca);
     } else {
         // Existing logic for regular barcodes
         const product = products.find(p => p.barcode === scannedCode);
@@ -1838,7 +2140,7 @@ function handleBarcodeScan(scannedCode) {
     }
 }
 
-export function addToCart(sku, scannedPrice = null) { // Added scannedPrice parameter
+export function addToCart(sku, scannedPrice = null, origem = 'scanner', codigoBalanca = '') { // Added parameters
     const product = products.find(p => p.sku === sku);
 
     if (!product) {
@@ -1847,7 +2149,8 @@ export function addToCart(sku, scannedPrice = null) { // Added scannedPrice para
         return;
     }
 
-    const cartItem = cart.find(item => item.sku === sku);
+    // Itens de balança com preço específico não devem ser consolidados para evitar erros de valor
+    const cartItem = (scannedPrice === null) ? cart.find(item => item.sku === sku) : null;
     const availableStock = product.stock - (cartItem ? cartItem.quantity : 0);
     if (availableStock <= 0) {
         showModal('Estoque Insuficiente', `Não há mais estoque para ${product.name}.`);
@@ -1858,8 +2161,19 @@ export function addToCart(sku, scannedPrice = null) { // Added scannedPrice para
         if (scannedPrice !== null) { // Update price if provided by scale
             cartItem.price = scannedPrice;
         }
+        // Se for balança, atualiza origem e código para auditoria na finalização se necessário
+        if (origem !== 'scanner') {
+            cartItem.origem = origem;
+            cartItem.codigoBalanca = codigoBalanca;
+        }
     } else {
-        cart.push({ ...product, quantity: 1, price: scannedPrice !== null ? scannedPrice : product.price }); // Use scannedPrice if available
+        cart.push({
+            ...product,
+            quantity: 1,
+            price: scannedPrice !== null ? scannedPrice : product.price,
+            origem,
+            codigoBalanca
+        }); // Use scannedPrice if available
     }
     renderCart();
     focusOnBarcode(); // <-- Adicionar aqui
@@ -2546,7 +2860,7 @@ async function handleAddProduct(event) {
         return;
     }
 
-    const newProduct = { sku, barcode, name, price, stock, minStock, usuarioId: auth.currentUser.uid };
+    const newProduct = { sku, barcode, name, price, stock, minStock, usaBalanca: false, usuarioId: auth.currentUser.uid };
 
     try {
         const docRef = await addDoc(collection(db, "products"), newProduct);
@@ -2741,6 +3055,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.id === 'cancel-sale-button') resetPdv();
         if (e.target.id === 'diversos-button') openDiversosModal();
         if (e.target.id === 'pdv-scan-button') startScanner(onPdvScanSuccess);
+        if (e.target.id === 'scale-config-button') openScaleConfigModal();
     });
     contentPdv.addEventListener('input', function (e) {
         if (e.target.id === 'barcode-input-field') handleBarcodeAutoDetect(e.target);
@@ -2749,6 +3064,38 @@ document.addEventListener('DOMContentLoaded', () => {
     contentInventory.addEventListener('submit', function (e) {
         if (e.target.id === 'add-product-form') handleAddProduct(e);
     });
+
+    // Eventos do Modal de Seleção de Balança
+    document.addEventListener('keydown', (e) => {
+        if (!isScaleModalOpen) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedScaleProductIndex = Math.min(selectedScaleProductIndex + 1, filteredScaleProducts.length - 1);
+            renderScaleProductsList();
+            resetScaleModalTimeout();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedScaleProductIndex = Math.max(selectedScaleProductIndex - 1, 0);
+            renderScaleProductsList();
+            resetScaleModalTimeout();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmScaleSelection();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeScaleSelectionModal(true);
+        }
+    });
+
+    document.getElementById('scale-product-search').addEventListener('input', (e) => {
+        filterScaleProducts(e.target.value);
+        selectedScaleProductIndex = 0;
+        resetScaleModalTimeout();
+    });
+
+    // Eventos do Modal de Configuração de Balança
+    document.getElementById('add-scale-product-form').addEventListener('submit', handleAddScaleProduct);
     contentInventory.addEventListener('click', function (e) {
         if (e.target.id === 'inventory-scan-button') startScanner(onInventoryScanSuccess);
     });
@@ -3000,7 +3347,13 @@ window.closeQuickReceiptModal = closeQuickReceiptModal;
 window.showModal = showModal;
 window.closeModal = closeModal;
 window.openManualDebtModal = openManualDebtModal;
+window.handleBarcodeScan = handleBarcodeScan;
 window.closeManualDebtModal = closeManualDebtModal;
+window.closeScaleSelectionModal = closeScaleSelectionModal;
+window.closeScaleConfigModal = closeScaleConfigModal;
+window.openScaleConfigModal = openScaleConfigModal;
+window.toggleScaleProduct = toggleScaleProduct;
+window.settings = settings;
 
 
 
