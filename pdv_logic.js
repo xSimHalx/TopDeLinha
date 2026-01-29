@@ -62,3 +62,25 @@ export function calculateCartTotal(cart) {
         return sum.add(itemTotal);
     }, currency(0, BRLConfig));
 }
+
+/**
+ * Analisa um código de barras para verificar se é do tipo balança com valor fechado.
+ * @param {string} scannedCode - O código lido.
+ * @returns {object|null} - Objeto com os dados se for balança, ou null caso contrário.
+ */
+export const parseScaleBarcode = (scannedCode) => {
+    // Verifica se começa com '2' e tem o tamanho esperado (13 dígitos para EAN-13)
+    if (scannedCode.startsWith('2') && scannedCode.length === 13) {
+        // Padrão EAN-13 Balança: [2][XXXXXX][VVVVV][C]
+        // Onde VVVVV é o valor total em centavos (5 dígitos)
+        const valuePart = scannedCode.substring(7, 12);
+        const value = parseFloat(valuePart) / 100;
+
+        return {
+            tipo: "BALANCA_VALOR",
+            valor: value,
+            codigoBalanca: scannedCode
+        };
+    }
+    return null;
+};

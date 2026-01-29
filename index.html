@@ -435,6 +435,10 @@
                 <label for="edit-product-min-stock" class="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
                 <input type="number" id="edit-product-min-stock" required class="mt-1 block w-full p-2 border rounded-md">
             </div>
+            <div class="flex items-center gap-2 py-2">
+                <input type="checkbox" id="edit-product-usa-balanca" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                <label for="edit-product-usa-balanca" class="text-sm font-medium text-gray-700 font-bold">Produto de Balança?</label>
+            </div>
             <div class="bg-gray-100 p-4 flex justify-end space-x-2">
                 <button type="button" onclick="closeEditProductModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
                 <button type="submit" id="update-product-button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
@@ -601,6 +605,81 @@
         </div>
     </div>
     
+    <!-- Modal de Seleção de Produto de Balança -->
+    <div id="scale-selection-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-[60] p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col transform transition-all scale-95">
+            <div class="p-6 bg-indigo-600 text-white text-center">
+                <h3 class="text-xl font-medium opacity-90">Produto de Balança</h3>
+                <div id="scale-detected-value" class="text-5xl font-bold mt-2">R$ 0,00</div>
+                <p class="mt-2 text-indigo-100">Selecione o item para lançar</p>
+            </div>
+            <div class="p-6 flex-grow flex flex-col min-h-[400px]">
+                <div class="relative mb-4">
+                    <input type="text" id="scale-product-search" placeholder="Buscar por nome ou SKU..."
+                        class="w-full p-4 pl-12 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:ring-0 text-lg outline-none transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div id="scale-products-list" class="flex-grow overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                    <!-- Lista de produtos filtrada -->
+                </div>
+                <div id="scale-modal-timeout-warning" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center font-medium animate-pulse">
+                    O modal fechará em breve por inatividade...
+                </div>
+            </div>
+            <div class="p-4 bg-gray-50 border-t flex justify-between items-center text-sm text-gray-500">
+                <span>↑↓ Navegar | Enter Confirmar | Esc Cancelar</span>
+                <button onclick="closeScaleSelectionModal()" class="text-red-600 font-bold hover:underline">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuração de Balança -->
+    <div id="scale-config-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="text-xl font-bold text-gray-900">Configurar Itens de Balança</h3>
+                <button onclick="closeScaleConfigModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div class="p-6 flex-grow overflow-y-auto">
+                 <div class="mb-8 p-6 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50">
+                     <h4 class="font-bold text-blue-800 mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Novo Item de Balança
+                     </h4>
+                     <form id="add-scale-product-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                         <div class="sm:col-span-2">
+                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto</label>
+                             <input type="text" id="scale-new-name" placeholder="Ex: Pão de Sal" required class="w-full p-2 border rounded-md">
+                         </div>
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">SKU / Cód. Interno</label>
+                            <input type="text" id="scale-new-sku" placeholder="Ex: 101" required class="w-full p-2 border rounded-md">
+                         </div>
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Preço Base (R$)</label>
+                            <input type="tel" id="scale-new-price" placeholder="R$ 0,00" required class="w-full p-2 border rounded-md">
+                         </div>
+                         <button type="submit" class="sm:col-span-2 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-md mt-2">
+                            Salvar Produto de Balança
+                         </button>
+                     </form>
+                 </div>
+
+                 <h4 class="font-bold text-gray-700 mb-4">Produtos Ativos na Balança</h4>
+                 <div id="scale-config-products-list" class="space-y-3">
+                     <!-- Itens serão renderizados aqui -->
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
     <script type="module" src="script.js"></script>
       </body>
 </html>
