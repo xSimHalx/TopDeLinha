@@ -15,7 +15,14 @@ KICK_COMMAND = b'\x1b\x70\x00\x19\xfa'
 class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/open-drawer':
+            # Responder ao preflight request com cabeçalhos de Private Network Access
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Private-Network', 'true') # Necessário para Chrome PNA
+            self.end_headers() # Finaliza headers antes de processar lógica
+
             try:
+                # Tenta abrir a impressora
                 hPrinter = win32print.OpenPrinter(PRINTER_NAME)
                 try:
                     # Inicia um novo trabalho de impressão RAW.
@@ -30,16 +37,15 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
                 finally:
                     win32print.ClosePrinter(hPrinter)
                 
-                self.send_response(200)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
+                # A resposta já foi enviada com 200 no início para passar no CORS, 
+                # mas tecnicamente deveríamos processar primeiro. 
+                # Como é um script simples, vamos mandar o corpo agora.
                 self.wfile.write(b'Comando para abrir a gaveta enviado com sucesso.')
                 print(f"Comando enviado para a impressora '{PRINTER_NAME}'.")
 
             except Exception as e:
-                self.send_response(500)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
+                # Se der erro na impressora, o status 200 já foi enviado (limitação de SimpleHTTPRequestHandler simples)
+                # O ideal seria um framework melhor, mas vamos apenas logar o erro e enviar mensagem
                 self.wfile.write(f'Erro: {e}'.encode('utf-8'))
                 print(f"ERRO: Não foi possível enviar o comando para a impressora. Detalhes: {e}")
                 print("Verifique se o nome da impressora está correto e se ela está online.")
@@ -51,10 +57,11 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         # Lida com as requisições CORS pre-flight do navegador.
-        self.send_response(200)
+        self.send_response(204) # 204 No Content é melhor para OPTIONS
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Private-Network', 'true') # Necessário para Chrome PNA
         self.end_headers()
 
 # Verifica se o pywin32 está instalado

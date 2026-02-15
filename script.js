@@ -514,11 +514,11 @@ function renderReleaseNotes() {
     container.innerHTML = releaseNotes.map((release, index) => {
         const isLatest = index === 0;
 
-        const cardClasses = isLatest 
+        const cardClasses = isLatest
             ? 'bg-blue-50 border-blue-200' // Usando a cor azul que sugerimos
             : 'bg-white border-gray-200';
-        
-        const newBadge = isLatest 
+
+        const newBadge = isLatest
             ? '<span class="ml-2 text-xs font-semibold text-white bg-blue-500 px-2 py-1 rounded-full align-middle">Mais Recente</span>'
             : '';
 
@@ -538,11 +538,17 @@ function renderReleaseNotes() {
 }
 
 function renderDashboardTab() {
-    const totalSalesToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum + sale.total, 0) : 0; // ORIGINAL: Calcula do DB
+    // CORREÇÃO: Usando currency() para somar e garantir precisão dos centavos
+    const totalSalesToday = currentDay
+        ? currentDay.shifts.flatMap(s => s.sales).reduce((sum, sale) => sum.add(sale.total), currency(0)).value
+        : 0;
+
     console.log('--- PONTO 3: Total calculado para o painel ---', totalSalesToday);
-    const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0; // ORIGINAL: Conta do DB
+    const salesCountToday = currentDay ? currentDay.shifts.flatMap(s => s.sales).length : 0;
     const lowStockItems = products.filter(p => p.stock <= p.minStock);
-    const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
+
+    // CORREÇÃO: Usando currency() para somar dívidas
+    const totalDebt = customers.reduce((sum, c) => sum.add(c.debt || 0), currency(0)).value;
 
     contentDashboard.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -2009,10 +2015,10 @@ function handleAddPayment(event) {
         return;
     }
     saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
-    
+
     // Limpa o campo para que seja preenchido com o novo valor restante
-    document.getElementById('payment-amount').value = ''; 
-    
+    document.getElementById('payment-amount').value = '';
+
     renderPaymentModal();
 }
 //fim limpar
@@ -2075,7 +2081,7 @@ async function confirmSale() {
                 saleInProgress.payments.push({ method: selectedPaymentMethod, amount: amount });
             }
         }
-        
+
         if (saleInProgress.payments.length === 0 && selectedPaymentMethod === 'Fiado') {
             saleInProgress.payments.push({ method: 'Fiado', amount: saleInProgress.total });
         }
@@ -2155,7 +2161,7 @@ async function confirmSale() {
                 await updateDoc(productRef, { stock: newStock });
                 product.stock = newStock; // <-- ADICIONE ESTA LINHA
             }
-        
+
         }
         if (fiadoPayment) {
             selectedCustomerForSale = saleData.customerId;
@@ -2210,7 +2216,7 @@ function renderReceipt(data, change, warning = '') {
         itemsEl.innerHTML = data.items.map(item => `
             <div>
                 <p>${item.quantity}x ${item.name}</p>
-                <p class="text-right">${formatCurrency(item.price * item.quantity)}</p>
+                <p class="text-right">${formatCurrency(currency(item.price).multiply(item.quantity).value)}</p>
             </div>
         `).join('');
         totalEl.textContent = formatCurrency(data.total);
@@ -2775,9 +2781,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPaymentModal();
         }
     });
-    document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
+    document.getElementById('payment-modal-customer-select').addEventListener('change', function () {
         saleInProgress.customerId = this.value;
-                renderPaymentModal();
+        renderPaymentModal();
 
     });
     document.getElementById('payment-amount').addEventListener('input', updateSaleConfirmationButton);
@@ -2855,7 +2861,7 @@ paymentModal.addEventListener('click', (e) => {
     }
 });
 
-document.getElementById('payment-modal-customer-select').addEventListener('change', function() {
+document.getElementById('payment-modal-customer-select').addEventListener('change', function () {
     saleInProgress.customerId = this.value;
 });
 
