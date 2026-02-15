@@ -2187,7 +2187,8 @@ function renderReceipt(data, change, warning = '') {
     document.getElementById('receipt-store-address').textContent = ci.address;
     document.getElementById('receipt-store-cnpj').textContent = ci.cnpj;
     document.getElementById('receipt-store-message').textContent = ci.receiptMessage;
-    document.getElementById('receipt-date').textContent = formatDateTime(data.date);
+    const dateObj = data.date instanceof Date ? data.date : new Date(data.date);
+    document.getElementById('receipt-date').textContent = isNaN(dateObj.getTime()) ? new Date().toLocaleString('pt-BR') : formatDateTime(dateObj);
     document.getElementById('receipt-customer').textContent = data.customerName || 'Consumidor';
 
     const itemsEl = document.getElementById('receipt-items');
