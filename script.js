@@ -146,6 +146,9 @@ onAuthStateChanged(auth, async (user) => {
             await loadInitialData();
             renderAll();
 
+            // Verifica se deve mostrar o onboarding
+            checkAndShowOnboarding();
+
             mainApp.classList.remove('hidden');
             mainApp.classList.add('flex');
 
@@ -557,6 +560,57 @@ function renderReleaseNotes() {
         `;
     }).join('');
 }
+
+// --- ONBOARDING / NOVIDADES ---
+function checkAndShowOnboarding() {
+    if (!releaseNotes || releaseNotes.length === 0) return;
+
+    const latestRelease = releaseNotes[0];
+    const latestVersion = latestRelease.version;
+    const lastSeenVersion = localStorage.getItem('lastSeenVersion');
+
+    // Se a versão atual for diferente da última vista, mostra o modal
+    // (Ou se nunca viu nenhuma versão)
+    if (latestVersion !== lastSeenVersion) {
+        const modal = document.getElementById('onboarding-modal');
+        const versionEl = document.getElementById('onboarding-version');
+        const contentEl = document.getElementById('onboarding-content');
+
+        if (modal && versionEl && contentEl) {
+            versionEl.textContent = latestVersion;
+
+            // Gera o HTML da lista de novidades
+            contentEl.innerHTML = `
+                <ul class="space-y-3">
+                    ${latestRelease.notes.map(note => `
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-green-100 text-green-500 mr-3">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                            <span class="text-gray-700 leading-relaxed">${note}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+
+            // Pequeno delay para garantir que não conflite com o loading screen
+            setTimeout(() => {
+                modal.classList.remove('hidden');
+            }, 1000);
+        }
+    }
+}
+
+window.closeOnboardingModal = function () {
+    const modal = document.getElementById('onboarding-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        // Salva que o usuário já viu esta versão
+        if (releaseNotes && releaseNotes.length > 0) {
+            localStorage.setItem('lastSeenVersion', releaseNotes[0].version);
+        }
+    }
+};
 
 function renderDashboardTab() {
     // CORREÇÃO: Usando currency() para somar e garantir precisão dos centavos

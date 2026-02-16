@@ -727,6 +727,32 @@
         </div>
     </div>
 
+    <!-- Onboarding Modal (Novidades) -->
+    <div id="onboarding-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all scale-95">
+            <div class="p-6 border-b flex justify-between items-center bg-indigo-50 rounded-t-lg">
+                <h3 class="text-2xl font-bold text-indigo-900 flex items-center gap-2">
+                    🎉 Novidades da Versão <span id="onboarding-version" class="text-indigo-600"></span>
+                </h3>
+                <button onclick="closeOnboardingModal()"
+                    class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-600 mb-4">Confira as melhorias que preparamos para você nesta atualização:</p>
+                <div id="onboarding-content" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                    <!-- Lista de novidades será injetada aqui -->
+                </div>
+            </div>
+            <div class="bg-gray-50 p-6 flex justify-end rounded-b-lg">
+                <button onclick="closeOnboardingModal()"
+                    class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 shadow-md transition-transform transform hover:scale-105">
+                    Entendi, vamos lá! 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Barcode Scanner Modal -->
     <div id="scanner-modal"
         class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
