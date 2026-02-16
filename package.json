@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "start": "python launcher.py",
+    "dev": "python launcher.py"
+  },
   "devDependencies": {
     "@playwright/browser-chromium": "1.44.0",
     "@playwright/test": "1.44.0",

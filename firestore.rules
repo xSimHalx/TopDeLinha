@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Função auxiliar para checar se o usuário é o dono do documento
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Função auxiliar para permitir leitura de dados legados (sem dono)
+    function isLegacy() {
+      // Permite ler se o documento NÃO tiver o campo 'usuarioId'
+      return !("usuarioId" in resource.data);
+    }
+
+    // Usuários só podem ler e escrever seu próprio documento de configuração
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Usuários podem criar produtos com seu ID e gerenciar apenas os seus próprios produtos
+    // Permite LER produtos antigos (sem dono) para migração futura
+    match /products/{productId} {
+      allow list, read: if isOwner(resource.data.usuarioId) || isLegacy();
+      allow update, delete: if isOwner(resource.data.usuarioId);
+      allow create: if isOwner(request.resource.data.usuarioId);
+    }
+
+    // Mesma lógica para clientes
+    match /customers/{customerId} {
+      allow list, read: if isOwner(resource.data.usuarioId) || isLegacy();
+      allow update, delete: if isOwner(resource.data.usuarioId);
+      allow create: if isOwner(request.resource.data.usuarioId);
+    }
+
+    // Mesma lógica para dias de operação
+    match /operating_days/{dayId} {
+      allow list, read: if isOwner(resource.data.usuarioId) || isLegacy();
+      allow update, delete: if isOwner(resource.data.usuarioId);
+      allow create: if isOwner(request.resource.data.usuarioId);
+    }
+
+    // Mesma lógica para o log de atividades
+    match /activity_log/{logId} {
+      allow list, read: if isOwner(resource.data.usuarioId) || isLegacy();
+      allow update, delete: if isOwner(resource.data.usuarioId);
+      allow create: if isOwner(request.resource.data.usuarioId);
+    }
+
+    // Permite que o utilizador autenticado leia e escreva nas suas 
+    // próprias subcoleções (como sales e debt_history).
+    match /users/{userId}/{documents=**} {
+      allow read, write: if isOwner(userId);
+    }
+      
+    // Permite que qualquer usuário autenticado crie logs de erro.
+    match /error_logs/{logId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
+    
+     // Coleção de notificações
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.usuarioId;
+      allow create: if request.auth != null && request.resource.data.usuarioId == request.auth.uid;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.usuarioId;
+    }
+  }
+}

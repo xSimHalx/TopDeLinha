@@ -130,15 +130,36 @@ function handleForgotPassword() {
     }
 }
 
+// --- ELEMENTOS DO DOM ---
+const loadingScreen = document.getElementById('loading-screen');
+// ... (outros elementos permanecem)
+
+// ...
+
 onAuthStateChanged(auth, async (user) => {
-    if (loginScreen && mainApp) { // Adicionado verificação para evitar erro em testes
+    if (loginScreen && mainApp) {
         if (user) {
+            // Usuário logado: Carrega dados ENQUANTO mostra o loader (que já está na tela por padrão no HTML ou visível)
             loginScreen.classList.add('hidden');
+            // O loader continua visível aqui
+
+            await loadInitialData();
+            renderAll();
+
             mainApp.classList.remove('hidden');
             mainApp.classList.add('flex');
-            await loadInitialData(); // Carrega os dados APÓS o login
-            renderAll();
+
+            // SÓ AGORA esconde o loader com um pequeno delay para suavidade
+            if (loadingScreen) {
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                }, 500);
+            }
+
         } else {
+            // Sem usuário: Esconde loader e mostra login
+            if (loadingScreen) loadingScreen.classList.add('hidden');
+
             loginScreen.classList.remove('hidden');
             mainApp.classList.add('hidden');
             mainApp.classList.remove('flex');

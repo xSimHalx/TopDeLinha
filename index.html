@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,29 +14,32 @@
     <style>
         @media print {
             @page {
-                size: 48mm auto; /* TENTATIVA FINAL: Força o tamanho do papel */
+                size: 48mm auto;
+                /* TENTATIVA FINAL: Força o tamanho do papel */
                 margin: 0;
             }
 
-            body, html {
+            body,
+            html {
                 margin: 0;
                 padding: 0;
-                background: white; 
+                background: white;
             }
 
-            body > *:not(#receipt-modal) {
+            body>*:not(#receipt-modal) {
                 display: none !important;
             }
 
             #receipt-modal {
-                width: 100%; /* Ocupa 100% do @page, que é 48mm */
+                width: 100%;
+                /* Ocupa 100% do @page, que é 48mm */
                 position: static !important;
                 padding: 1.5mm !important;
                 box-sizing: border-box !important;
             }
 
             #receipt-content,
-            #receipt-content > div {
+            #receipt-content>div {
                 width: 100% !important;
                 max-width: 100% !important;
                 padding: 0 !important;
@@ -54,7 +58,7 @@
                 padding: 0;
                 line-height: 1.3;
             }
-            
+
             #receipt-content p,
             #receipt-content h3 {
                 margin-bottom: 4px !important;
@@ -70,8 +74,27 @@
             }
         }
     </style>
-</head> 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 overflow-hidden">
+    <!-- 
+      1. TELA DE CARREGAMENTO (#loading-screen)
+      - fixed inset-0: Garante que cubra a tela inteira.
+      - z-50: Garante que fique ACIMA de qualquer outro elemento.
+      - flex items-center justify-center: Centraliza o spinner.
+    -->
+    <div id="loading-screen"
+        class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white transition-opacity duration-500">
+        <!-- Spinner SVG animado -->
+        <svg class="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+        <p class="text-gray-600 font-medium text-lg">Carregando sistema...</p>
+    </div>
 
     <!-- Ecrã de Login -->
     <div id="login-screen" class="w-full max-w-sm">
@@ -81,17 +104,21 @@
             <form id="login-form" class="mt-8 space-y-6">
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="">
+                    <input id="email" name="email" type="email" autocomplete="email" required
+                        class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="">
                 </div>
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="">
+                    <input id="password" name="password" type="password" autocomplete="current-password" required
+                        class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm" value="">
                 </div>
                 <div class="text-sm text-center">
-                    <a href="#" id="forgot-password-link" class="font-medium text-indigo-600 hover:text-indigo-500">Esqueceu a sua senha?</a>
+                    <a href="#" id="forgot-password-link"
+                        class="font-medium text-indigo-600 hover:text-indigo-500">Esqueceu a sua senha?</a>
                 </div>
                 <div>
-                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Entrar</button>
+                    <button type="submit"
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Entrar</button>
                 </div>
             </form>
         </div>
@@ -105,7 +132,8 @@
                 <p class="text-gray-300 mt-1">PDV | Estoque | Caixa | Clientes | Relatórios</p>
             </div>
             <div>
-                <button id="logout-button" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 text-sm">Sair</button>
+                <button id="logout-button"
+                    class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 text-sm">Sair</button>
             </div>
         </header>
 
@@ -113,12 +141,15 @@
         <div class="border-b border-gray-200 flex-shrink-0">
             <nav class="flex -mb-px px-4 space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs">
                 <button onclick="changeTab('dashboard')" id="tab-dashboard" class="tab-button active">Painel</button>
-                <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button">Gestão de Caixa</button>
-                <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button" disabled>Frente de Caixa (PDV)</button>
+                <button onclick="changeTab('cash-register')" id="tab-cash-register" class="tab-button">Gestão de
+                    Caixa</button>
+                <button onclick="changeTab('pdv')" id="tab-pdv" class="tab-button" disabled>Frente de Caixa
+                    (PDV)</button>
                 <button onclick="changeTab('inventory')" id="tab-inventory" class="tab-button">Estoque</button>
                 <button onclick="changeTab('customers')" id="tab-customers" class="tab-button">Clientes</button>
                 <button onclick="changeTab('reports')" id="tab-reports" class="tab-button">Relatórios</button>
-                <button onclick="changeTab('activities')" id="tab-activities" class="tab-button">Atividades/Historico</button>
+                <button onclick="changeTab('activities')" id="tab-activities"
+                    class="tab-button">Atividades/Historico</button>
                 <button onclick="changeTab('settings')" id="tab-settings" class="tab-button">Configurações</button>
             </nav>
         </div>
@@ -128,60 +159,75 @@
             <div class="p-4 sm:p-6 md:p-8">
                 <div id="content-dashboard" class="tab-content"></div>
                 <div id="content-cash-register" class="tab-content hidden">
-                <!-- Estado: Caixa Fechado (Nenhum dia aberto) -->
-                <div id="cash-register-closed-state" class="text-center py-10">
-                    <h3 class="text-xl font-bold text-gray-700">O caixa está fechado.</h3>
-                    <p class="text-gray-500 mt-2">Para começar, abra um novo dia de operações.</p>
-                    <form id="open-day-form" class="mt-6 max-w-sm mx-auto bg-white p-6 rounded-lg shadow">
-                        <div class="mb-4">
-                            <label for="initial-cash" class="block text-sm font-medium text-gray-700">Fundo de Troco Inicial (R$)</label>
-                            <input type="tel" id="initial-cash" value="100,00" placeholder="R$ 100,00" required class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
-                        </div>
-                        <div class="mb-4">
-                            <label for="opening-user" class="block text-sm font-medium text-gray-700">Operador de Abertura</label>
-                            <select id="opening-user" required class="mt-1 block w-full p-2 border rounded-md"></select>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Abrir Dia</button>
-                    </form>
-                </div>
-
-                <!-- Estado: Turno Ativo -->
-                <div id="cash-register-active-shift-state" class="hidden">
-                    <h3 class="text-xl font-bold text-gray-700">Turno em Andamento</h3>
-                    <div class="mt-4 bg-white p-6 rounded-lg shadow grid grid-cols-2 gap-4">
-                        <p><strong>Início do Turno:</strong> <span id="session-start-time"></span></p>
-                        <p><strong>Aberto por:</strong> <span id="session-opened-by"></span></p>
-                    </div>
-                    <div class="mt-6">
-                        <h4 class="font-semibold">Fechar o Turno Atual</h4>
-                        <form id="close-shift-form" class="mt-2 max-w-sm bg-white p-6 rounded-lg shadow">
+                    <!-- Estado: Caixa Fechado (Nenhum dia aberto) -->
+                    <div id="cash-register-closed-state" class="text-center py-10">
+                        <h3 class="text-xl font-bold text-gray-700">O caixa está fechado.</h3>
+                        <p class="text-gray-500 mt-2">Para começar, abra um novo dia de operações.</p>
+                        <form id="open-day-form" class="mt-6 max-w-sm mx-auto bg-white p-6 rounded-lg shadow">
                             <div class="mb-4">
-                                <label for="closing-user" class="block text-sm font-medium text-gray-700">Operador de Fechamento</label>
-                                <select id="closing-user" required class="mt-1 block w-full p-2 border rounded-md"></select>
+                                <label for="initial-cash" class="block text-sm font-medium text-gray-700">Fundo de Troco
+                                    Inicial (R$)</label>
+                                <input type="tel" id="initial-cash" value="100,00" placeholder="R$ 100,00" required
+                                    class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
                             </div>
-                            <button id="close-shift-button" type="button" class="w-full bg-yellow-500 text-white font-bold py-2 rounded-lg">Fechar Turno</button>
+                            <div class="mb-4">
+                                <label for="opening-user" class="block text-sm font-medium text-gray-700">Operador de
+                                    Abertura</label>
+                                <select id="opening-user" required
+                                    class="mt-1 block w-full p-2 border rounded-md"></select>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Abrir
+                                Dia</button>
                         </form>
                     </div>
-                </div>
 
-                <!-- Estado: Dia Aberto, Aguardando Turno -->
-                <div id="cash-register-waiting-shift-state" class="hidden text-center py-10">
-                    <h3 class="text-xl font-bold text-gray-700">Dia Aberto. Aguardando novo turno.</h3>
-                    <p class="text-gray-500 mt-2">O turno anterior foi fechado. Abra um novo para continuar as vendas.</p>
-                    <form id="open-shift-form" class="mt-6 max-w-sm mx-auto bg-white p-6 rounded-lg shadow">
-                        <div class="mb-4">
-                            <label for="next-opening-user" class="block text-sm font-medium text-gray-700">Operador</label>
-                            <select id="next-opening-user" required class="mt-1 block w-full p-2 border rounded-md"></select>
+                    <!-- Estado: Turno Ativo -->
+                    <div id="cash-register-active-shift-state" class="hidden">
+                        <h3 class="text-xl font-bold text-gray-700">Turno em Andamento</h3>
+                        <div class="mt-4 bg-white p-6 rounded-lg shadow grid grid-cols-2 gap-4">
+                            <p><strong>Início do Turno:</strong> <span id="session-start-time"></span></p>
+                            <p><strong>Aberto por:</strong> <span id="session-opened-by"></span></p>
                         </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Iniciar Novo Turno</button>
-                    </form>
-                    <div class="mt-8 border-t pt-6">
-                        <h4 class="font-semibold">Ou feche o dia de operações:</h4>
-                        <button id="close-day-button" class="mt-4 bg-red-600 text-white font-bold py-2 px-6 rounded-lg">Fechar Dia</button>
+                        <div class="mt-6">
+                            <h4 class="font-semibold">Fechar o Turno Atual</h4>
+                            <form id="close-shift-form" class="mt-2 max-w-sm bg-white p-6 rounded-lg shadow">
+                                <div class="mb-4">
+                                    <label for="closing-user" class="block text-sm font-medium text-gray-700">Operador
+                                        de Fechamento</label>
+                                    <select id="closing-user" required
+                                        class="mt-1 block w-full p-2 border rounded-md"></select>
+                                </div>
+                                <button id="close-shift-button" type="button"
+                                    class="w-full bg-yellow-500 text-white font-bold py-2 rounded-lg">Fechar
+                                    Turno</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Estado: Dia Aberto, Aguardando Turno -->
+                    <div id="cash-register-waiting-shift-state" class="hidden text-center py-10">
+                        <h3 class="text-xl font-bold text-gray-700">Dia Aberto. Aguardando novo turno.</h3>
+                        <p class="text-gray-500 mt-2">O turno anterior foi fechado. Abra um novo para continuar as
+                            vendas.</p>
+                        <form id="open-shift-form" class="mt-6 max-w-sm mx-auto bg-white p-6 rounded-lg shadow">
+                            <div class="mb-4">
+                                <label for="next-opening-user"
+                                    class="block text-sm font-medium text-gray-700">Operador</label>
+                                <select id="next-opening-user" required
+                                    class="mt-1 block w-full p-2 border rounded-md"></select>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Iniciar Novo
+                                Turno</button>
+                        </form>
+                        <div class="mt-8 border-t pt-6">
+                            <h4 class="font-semibold">Ou feche o dia de operações:</h4>
+                            <button id="close-day-button"
+                                class="mt-4 bg-red-600 text-white font-bold py-2 px-6 rounded-lg">Fechar Dia</button>
+                        </div>
                     </div>
                 </div>
-                </div>
-                                <div id="content-pdv" class="tab-content hidden">
+                <div id="content-pdv" class="tab-content hidden">
                     <!-- O conteúdo do PDV será renderizado dinamicamente aqui -->
                 </div>
                 <div id="content-inventory" class="tab-content hidden"></div>
@@ -195,22 +241,30 @@
                             <h3 class="font-semibold text-xl text-gray-700 mb-4">Informações da Empresa</h3>
                             <form id="company-info-form" class="space-y-4 bg-white p-6 rounded-lg shadow">
                                 <div>
-                                    <label for="store-name" class="block text-sm font-medium text-gray-700">Nome da Loja</label>
+                                    <label for="store-name" class="block text-sm font-medium text-gray-700">Nome da
+                                        Loja</label>
                                     <input type="text" id="store-name" class="mt-1 block w-full p-2 border rounded-md">
                                 </div>
                                 <div>
-                                    <label for="store-address" class="block text-sm font-medium text-gray-700">Endereço</label>
-                                    <input type="text" id="store-address" class="mt-1 block w-full p-2 border rounded-md">
+                                    <label for="store-address"
+                                        class="block text-sm font-medium text-gray-700">Endereço</label>
+                                    <input type="text" id="store-address"
+                                        class="mt-1 block w-full p-2 border rounded-md">
                                 </div>
                                 <div>
-                                    <label for="store-cnpj" class="block text-sm font-medium text-gray-700">CNPJ / Documento</label>
+                                    <label for="store-cnpj" class="block text-sm font-medium text-gray-700">CNPJ /
+                                        Documento</label>
                                     <input type="text" id="store-cnpj" class="mt-1 block w-full p-2 border rounded-md">
                                 </div>
                                 <div>
-                                    <label for="store-receipt-message" class="block text-sm font-medium text-gray-700">Mensagem no Recibo</label>
-                                    <input type="text" id="store-receipt-message" class="mt-1 block w-full p-2 border rounded-md">
+                                    <label for="store-receipt-message"
+                                        class="block text-sm font-medium text-gray-700">Mensagem no Recibo</label>
+                                    <input type="text" id="store-receipt-message"
+                                        class="mt-1 block w-full p-2 border rounded-md">
                                 </div>
-                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700">Salvar Informações</button>
+                                <button type="submit"
+                                    class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700">Salvar
+                                    Informações</button>
                             </form>
                         </div>
 
@@ -219,8 +273,10 @@
                             <h3 class="font-semibold text-xl text-gray-700 mb-4">Gestão de Operadores</h3>
                             <div class="bg-white p-6 rounded-lg shadow">
                                 <form id="add-operator-form" class="flex items-center gap-2 mb-4">
-                                    <input type="text" id="new-operator-name" placeholder="Nome do novo operador" required class="flex-grow p-2 border rounded-md">
-                                    <button type="submit" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Adicionar</button>
+                                    <input type="text" id="new-operator-name" placeholder="Nome do novo operador"
+                                        required class="flex-grow p-2 border rounded-md">
+                                    <button type="submit"
+                                        class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Adicionar</button>
                                 </form>
                                 <div id="operators-list" class="space-y-2">
                                     <!-- Lista de operadores será renderizada aqui -->
@@ -235,9 +291,13 @@
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="font-semibold">Programa para Abrir Gaveta Automática</p>
-                                        <p class="text-sm text-gray-500">Necessário para a função "Abrir Gaveta" funcionar.</p>
+                                        <p class="text-sm text-gray-500">Necessário para a função "Abrir Gaveta"
+                                            funcionar.</p>
                                     </div>
-                                    <a href="https://github.com/xSimHalx/TopDeLinha/releases/download/Server/drawer_server.exe" id="download-drawer-server-link" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700" target="_blank" rel="noopener noreferrer">Baixar</a>
+                                    <a href="https://github.com/xSimHalx/TopDeLinha/releases/download/Server/drawer_server.exe"
+                                        id="download-drawer-server-link"
+                                        class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700"
+                                        target="_blank" rel="noopener noreferrer">Baixar</a>
                                 </div>
                             </div>
                         </div>
@@ -248,7 +308,8 @@
     </div>
 
     <!-- MODAIS -->
-    <div id="payment-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div id="payment-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all scale-95">
             <div class="p-6 border-b flex justify-between items-center">
                 <h3 class="text-2xl font-bold text-gray-900">Finalizar Venda</h3>
@@ -257,42 +318,53 @@
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
                     <h4 class="font-semibold text-lg">Resumo da Compra</h4>
-                    <div id="payment-modal-cart-summary" class="text-sm max-h-40 overflow-y-auto pr-2 border-b pb-2"></div>
+                    <div id="payment-modal-cart-summary" class="text-sm max-h-40 overflow-y-auto pr-2 border-b pb-2">
+                    </div>
                     <div class="text-right">
                         <p class="text-gray-600">Total a Pagar</p>
                         <p id="payment-modal-total" class="text-3xl font-bold text-indigo-600"></p>
                     </div>
                     <div>
-                        <label for="payment-modal-customer-select" class="block text-sm font-medium text-gray-700">Associar Cliente (opcional)</label>
-                        <select id="payment-modal-customer-select" class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm"></select>
+                        <label for="payment-modal-customer-select"
+                            class="block text-sm font-medium text-gray-700">Associar Cliente (opcional)</label>
+                        <select id="payment-modal-customer-select"
+                            class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm"></select>
                     </div>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg space-y-4">
                     <h4 class="font-semibold text-lg">Pagamento</h4>
                     <div id="payment-method-options" class="grid grid-cols-3 gap-2">
                         <button data-method="Dinheiro" class="payment-method-btn p-3 rounded-md">Dinheiro</button>
-                        <button data-method="Cartão de Crédito" class="payment-method-btn p-3 rounded-md">Crédito</button>
+                        <button data-method="Cartão de Crédito"
+                            class="payment-method-btn p-3 rounded-md">Crédito</button>
                         <button data-method="Cartão de Débito" class="payment-method-btn p-3 rounded-md">Débito</button>
                         <button data-method="Pix" class="payment-method-btn p-3 rounded-md">Pix</button>
                         <button data-method="Fiado" class="payment-method-btn p-3 rounded-md">Fiado</button>
                     </div>
                     <form id="add-payment-form" class="flex items-end gap-2">
                         <div class="flex-grow">
-                             <label for="payment-amount" class="block text-sm font-medium">Valor</label>
-                            <input type="tel" id="payment-amount" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm" autocomplete="off">
+                            <label for="payment-amount" class="block text-sm font-medium">Valor</label>
+                            <input type="tel" id="payment-amount" placeholder="R$ 0,00" required
+                                class="mt-1 block w-full p-2 border-gray-300 rounded-md shadow-sm" autocomplete="off">
                         </div>
-                        <button type="submit" class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 h-10">Adicionar</button>
+                        <button type="submit"
+                            class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 h-10">Adicionar</button>
                     </form>
                     <div id="payment-modal-payments-list" class="text-sm space-y-1"></div>
                     <div class="border-t pt-4 pb-4 space-y-2 text-right">
-                        <p class="text-gray-600">Valor Pago: <span id="payment-modal-paid-amount" class="font-bold text-xl">R$ 0,00</span></p>
-                        <p class="text-gray-600 text-red-600">Troco: <span id="payment-modal-change" class="font-bold text-xl">R$ 0,00</span></p>
+                        <p class="text-gray-600">Valor Pago: <span id="payment-modal-paid-amount"
+                                class="font-bold text-xl">R$ 0,00</span></p>
+                        <p class="text-gray-600 text-red-600">Troco: <span id="payment-modal-change"
+                                class="font-bold text-xl">R$ 0,00</span></p>
                     </div>
                 </div>
             </div>
             <div class="bg-gray-100 p-4 flex justify-end">
-                <button onclick="closePaymentModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                <button id="confirm-sale-button" type="button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>Confirmar Venda</button>
+                <button onclick="closePaymentModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                <button id="confirm-sale-button" type="button"
+                    class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                    disabled>Confirmar Venda</button>
             </div>
         </div>
     </div>
@@ -307,7 +379,8 @@
             <button onclick="closeModal()" class="mt-6 bg-indigo-600 text-white px-4 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
-    <div id="edit-customer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div id="edit-customer-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6 border-b">
                 <h3 class="text-2xl font-bold text-gray-900">Editar Cliente</h3>
@@ -318,22 +391,27 @@
                     <label for="edit-customer-name" class="block text-sm font-medium text-gray-700">Nome</label>
                     <input type="text" id="edit-customer-name" required class="mt-1 block w-full p-2 border rounded-md">
                 </div>
-                 <div>
+                <div>
                     <label for="edit-customer-phone" class="block text-sm font-medium text-gray-700">Telefone</label>
                     <input type="text" id="edit-customer-phone" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
-                 <div>
-                    <label for="edit-customer-debt" class="block text-sm font-medium text-gray-700">Dívida Atual (R$)</label>
-                    <input type="tel" id="edit-customer-debt" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
+                <div>
+                    <label for="edit-customer-debt" class="block text-sm font-medium text-gray-700">Dívida Atual
+                        (R$)</label>
+                    <input type="tel" id="edit-customer-debt" placeholder="R$ 0,00" required
+                        class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
                 </div>
             </form>
             <div class="bg-gray-100 p-4 flex justify-end">
-                <button onclick="closeEditCustomerModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                <button id="update-customer-button" type="button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
+                <button onclick="closeEditCustomerModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                <button id="update-customer-button" type="button"
+                    class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
             </div>
         </div>
     </div>
-    <div id="debt-payment-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div id="debt-payment-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6 border-b">
                 <h3 class="text-2xl font-bold text-gray-900">Receber Pagamento</h3>
@@ -342,17 +420,23 @@
                 <input type="hidden" id="debt-customer-id">
                 <div>
                     <p>Cliente: <span id="debt-customer-name" class="font-semibold"></span></p>
-                    <p>Dívida Atual: <span id="debt-customer-current-debt" class="font-semibold text-red-600"></span></p>
+                    <p>Dívida Atual: <span id="debt-customer-current-debt" class="font-semibold text-red-600"></span>
+                    </p>
                 </div>
                 <div>
-                    <label for="debt-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
+                    <label for="debt-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar
+                        (R$)</label>
                     <div class="flex items-center gap-2 mt-1">
-                        <input type="tel" id="debt-payment-amount" placeholder="R$ 0,00" required class="block w-full p-2 border rounded-md" autocomplete="off">
-                        <button type="button" id="pay-full-debt-button" class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-2 rounded-md hover:bg-blue-200 whitespace-nowrap">Pagar Total</button>
+                        <input type="tel" id="debt-payment-amount" placeholder="R$ 0,00" required
+                            class="block w-full p-2 border rounded-md" autocomplete="off">
+                        <button type="button" id="pay-full-debt-button"
+                            class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-2 rounded-md hover:bg-blue-200 whitespace-nowrap">Pagar
+                            Total</button>
                     </div>
                 </div>
                 <div>
-                    <label for="debt-payment-method" class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+                    <label for="debt-payment-method" class="block text-sm font-medium text-gray-700">Forma de
+                        Pagamento</label>
                     <select id="debt-payment-method" required class="mt-1 block w-full p-2 border rounded-md">
                         <option>Dinheiro</option>
                         <option>Pix</option>
@@ -362,181 +446,234 @@
                 </div>
             </form>
             <div class="bg-gray-100 p-4 flex justify-end">
-                <button onclick="closeDebtPaymentModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                <button id="confirm-debt-payment-button" type="button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Confirmar Recebimento</button>
+                <button onclick="closeDebtPaymentModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                <button id="confirm-debt-payment-button" type="button"
+                    class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Confirmar
+                    Recebimento</button>
             </div>
         </div>
     </div>
-    <div id="edit-or-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
-        <div class="p-6 border-b text-center">
-            <h3 class="text-xl font-bold text-gray-900">Produto Encontrado!</h3>
-            <p id="edit-or-delete-modal-message" class="mt-2 text-sm text-gray-500"></p>
-        </div>
-        <div class="p-6 flex justLOify-around">
-            <button id="edit-product-choice-button" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700">Editar</button>
-            <button id="delete-product-choice-button" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Excluir</button>
+    <div id="edit-or-delete-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
+            <div class="p-6 border-b text-center">
+                <h3 class="text-xl font-bold text-gray-900">Produto Encontrado!</h3>
+                <p id="edit-or-delete-modal-message" class="mt-2 text-sm text-gray-500"></p>
+            </div>
+            <div class="p-6 flex justLOify-around">
+                <button id="edit-product-choice-button"
+                    class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700">Editar</button>
+                <button id="delete-product-choice-button"
+                    class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Excluir</button>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="debt-statement-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
-        <div class="p-6 border-b">
-            <h3 class="text-2xl font-bold text-gray-900">Extrato do Cliente</h3>
-        </div>
-        <div class="p-6">
-            <div class="mb-4">
-                <p class="text-lg">Cliente: <span id="statement-customer-name" class="font-semibold"></span></p>
-                <p class="text-lg">Saldo Devedor Atual: <span id="statement-customer-debt" class="font-semibold text-red-600"></span></p>
+    <div id="debt-statement-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div class="p-6 border-b">
+                <h3 class="text-2xl font-bold text-gray-900">Extrato do Cliente</h3>
             </div>
-            <div class="border-t pt-4">
-                <h4 class="font-semibold mb-2">Histórico de Transações</h4>
-                <div id="statement-transactions-list" class="max-h-64 overflow-y-auto space-y-2">
-                    </div>
-            </div>
-        </div>
-        <div class="bg-gray-100 p-4 flex justify-end">
-            <button onclick="closeDebtStatementModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
-        </div>
-    </div>
-</div>
-<!-- Modal excluir e ditar estoque-->
-
-<div id="edit-product-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all scale-95">
-        <div class="p-6 border-b flex justify-between items-center">
-            <h3 class="text-2xl font-bold text-gray-900">Editar Produto</h3>
-            <button onclick="closeEditProductModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
-        </div>
-        <form id="edit-product-form" class="p-6 space-y-4">
-            <input type="hidden" id="edit-product-id">
-            <div>
-                <label for="edit-product-sku" class="block text-sm font-medium text-gray-700">Código Interno (SKU)</label>
-                <input type="text" id="edit-product-sku" required disabled class="mt-1 block w-full p-2 border rounded-md bg-gray-100 cursor-not-allowed">
-            </div>
-            <div>
-                <label for="edit-product-barcode" class="block text-sm font-medium text-gray-700">Código de Barras</label>
-                <input type="text" id="edit-product-barcode" class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label for="edit-product-name" class="block text-sm font-medium text-gray-700">Nome do Produto</label>
-                <input type="text" id="edit-product-name" required class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label for="edit-product-price" class="block text-sm font-medium text-gray-700">Preço (R$)</label>
-                <input type="tel" id="edit-product-price" placeholder="R$ 0,00" required class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
-            </div>
-            <div>
-                <label for="edit-product-stock" class="block text-sm font-medium text-gray-700">Estoque</label>
-                <input type="number" id="edit-product-stock" required class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label for="edit-product-min-stock" class="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
-                <input type="number" id="edit-product-min-stock" required class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div class="bg-gray-100 p-4 flex justify-end space-x-2">
-                <button type="button" onclick="closeEditProductModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
-                <button type="submit" id="update-product-button" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar Alterações</button>
-            </div>
-        </form>
-    </div>
-</div>
-<div id="quick-receipt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
-        <div class="p-6 border-b flex justify-between items-center">
-            <h3 class="text-2xl font-bold text-gray-900">Recebimento Rápido</h3>
-            <button onclick="closeQuickReceiptModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
-        </div>
-        <div class="p-6">
-             <div class="mb-4">
-                <label for="modal-receipts-customer-search" class="block text-sm font-medium text-gray-700">1. Pesquisar Cliente por Nome</label>
-                <input type="text" id="modal-receipts-customer-search" placeholder="Digite o nome do cliente com dívida..." class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
-                <div id="modal-receipts-search-results" class="mt-2 max-h-48 overflow-y-auto border rounded-md"></div>
-            </div>
-            <div id="modal-receipts-payment-area" class="hidden mt-8">
-                <h4 class="text-lg font-semibold text-gray-700">2. Detalhes do Pagamento</h4>
-                <div class="my-4 p-4 bg-gray-50 rounded-md border">
-                    <p>Cliente: <span id="modal-receipts-customer-name" class="font-bold text-lg"></span></p>
-                    <p>Dívida Atual: <span id="modal-receipts-current-debt" class="font-bold text-lg text-red-600"></span></p>
+            <div class="p-6">
+                <div class="mb-4">
+                    <p class="text-lg">Cliente: <span id="statement-customer-name" class="font-semibold"></span></p>
+                    <p class="text-lg">Saldo Devedor Atual: <span id="statement-customer-debt"
+                            class="font-semibold text-red-600"></span></p>
                 </div>
-                <form id="modal-quick-receipt-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label for="modal-receipts-payment-amount" class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
-                        <input type="tel" id="modal-receipts-payment-amount" class="mt-1 block w-full p-2 border rounded-md">
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-2">Histórico de Transações</h4>
+                    <div id="statement-transactions-list" class="max-h-64 overflow-y-auto space-y-2">
                     </div>
-                    <div>
-                        <label for="modal-receipts-payment-method" class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
-                        <select id="modal-receipts-payment-method" class="mt-1 block w-full p-2 border rounded-md">
-                            <option>Dinheiro</option>
-                            <option>Pix</option>
-                            <option>Cartão de Crédito</option>
-                            <option>Cartão de Débito</option>
-                        </select>
-                    </div>
-                </form>
-                 <div class="mt-6 flex gap-4">
-                    <button id="modal-receipts-pay-full-debt-button" type="button" class="w-full bg-blue-100 text-blue-800 font-bold py-2 rounded-lg hover:bg-blue-200">Pagar Valor Total</button>
-                    <button id="modal-receipts-confirm-payment-button" type="button" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">Confirmar Recebimento</button>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div id="add-customer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-         <div class="p-6 border-b flex justify-between items-center">
-            <h3 class="text-2xl font-bold text-gray-900">Adicionar Novo Cliente</h3>
-            <button onclick="closeAddCustomerModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
-        </div>
-        <form id="modal-add-customer-form" class="p-6 space-y-4">
-            <input type="text" id="modal-new-customer-name" placeholder="Nome Completo" required class="w-full p-2 border rounded">
-            <input type="text" id="modal-new-customer-phone" placeholder="Telefone (opcional)" class="w-full p-2 border rounded">
             <div class="bg-gray-100 p-4 flex justify-end">
-                 <button onclick="closeAddCustomerModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                 <button type="submit" class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar Cliente</button>
+                <button onclick="closeDebtStatementModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
             </div>
-        </form>
-    </div>
-</div>
-
-<div id="manual-debt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-        <div class="p-6 border-b flex justify-between items-center">
-            <h3 class="text-2xl font-bold text-gray-900">Adicionar Dívida Manual</h3>
-            <button onclick="closeManualDebtModal()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
         </div>
-        <form id="manual-debt-form" class="p-6 space-y-4">
-            <input type="hidden" id="manual-debt-customer-id">
-            <p>Cliente: <span id="manual-debt-customer-name" class="font-semibold"></span></p>
-            <div>
-                <label for="manual-debt-amount" class="block text-sm font-medium text-gray-700">Valor da Dívida (R$)</label>
-                <input type="tel" id="manual-debt-amount" required class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label for="manual-debt-description" class="block text-sm font-medium text-gray-700">Descrição (Opcional)</label>
-                <input type="text" id="manual-debt-description" placeholder="Ex: Dívida antiga, Vale" class="mt-1 block w-full p-2 border rounded-md">
-            </div>
-            <div class="bg-gray-100 p-4 flex justify-end gap-2">
-                <button type="button" onclick="closeManualDebtModal()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
-                <button type="submit" class="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Adicionar Dívida</button>
-            </div>
-        </form>
     </div>
-</div>
+    <!-- Modal excluir e ditar estoque-->
+
+    <div id="edit-product-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all scale-95">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Editar Produto</h3>
+                <button onclick="closeEditProductModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form id="edit-product-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-product-id">
+                <div>
+                    <label for="edit-product-sku" class="block text-sm font-medium text-gray-700">Código Interno
+                        (SKU)</label>
+                    <input type="text" id="edit-product-sku" required disabled
+                        class="mt-1 block w-full p-2 border rounded-md bg-gray-100 cursor-not-allowed">
+                </div>
+                <div>
+                    <label for="edit-product-barcode" class="block text-sm font-medium text-gray-700">Código de
+                        Barras</label>
+                    <input type="text" id="edit-product-barcode" class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="edit-product-name" class="block text-sm font-medium text-gray-700">Nome do
+                        Produto</label>
+                    <input type="text" id="edit-product-name" required class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="edit-product-price" class="block text-sm font-medium text-gray-700">Preço (R$)</label>
+                    <input type="tel" id="edit-product-price" placeholder="R$ 0,00" required
+                        class="mt-1 block w-full p-2 border rounded-md" autocomplete="off">
+                </div>
+                <div>
+                    <label for="edit-product-stock" class="block text-sm font-medium text-gray-700">Estoque</label>
+                    <input type="number" id="edit-product-stock" required
+                        class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="edit-product-min-stock" class="block text-sm font-medium text-gray-700">Estoque
+                        Mínimo</label>
+                    <input type="number" id="edit-product-min-stock" required
+                        class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div class="bg-gray-100 p-4 flex justify-end space-x-2">
+                    <button type="button" onclick="closeEditProductModal()"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                    <button type="submit" id="update-product-button"
+                        class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">Salvar
+                        Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="quick-receipt-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Recebimento Rápido</h3>
+                <button onclick="closeQuickReceiptModal()"
+                    class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label for="modal-receipts-customer-search" class="block text-sm font-medium text-gray-700">1.
+                        Pesquisar Cliente por Nome</label>
+                    <input type="text" id="modal-receipts-customer-search"
+                        placeholder="Digite o nome do cliente com dívida..."
+                        class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm text-lg">
+                    <div id="modal-receipts-search-results" class="mt-2 max-h-48 overflow-y-auto border rounded-md">
+                    </div>
+                </div>
+                <div id="modal-receipts-payment-area" class="hidden mt-8">
+                    <h4 class="text-lg font-semibold text-gray-700">2. Detalhes do Pagamento</h4>
+                    <div class="my-4 p-4 bg-gray-50 rounded-md border">
+                        <p>Cliente: <span id="modal-receipts-customer-name" class="font-bold text-lg"></span></p>
+                        <p>Dívida Atual: <span id="modal-receipts-current-debt"
+                                class="font-bold text-lg text-red-600"></span></p>
+                    </div>
+                    <form id="modal-quick-receipt-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="modal-receipts-payment-amount"
+                                class="block text-sm font-medium text-gray-700">Valor a Pagar (R$)</label>
+                            <input type="tel" id="modal-receipts-payment-amount"
+                                class="mt-1 block w-full p-2 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="modal-receipts-payment-method"
+                                class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+                            <select id="modal-receipts-payment-method" class="mt-1 block w-full p-2 border rounded-md">
+                                <option>Dinheiro</option>
+                                <option>Pix</option>
+                                <option>Cartão de Crédito</option>
+                                <option>Cartão de Débito</option>
+                            </select>
+                        </div>
+                    </form>
+                    <div class="mt-6 flex gap-4">
+                        <button id="modal-receipts-pay-full-debt-button" type="button"
+                            class="w-full bg-blue-100 text-blue-800 font-bold py-2 rounded-lg hover:bg-blue-200">Pagar
+                            Valor Total</button>
+                        <button id="modal-receipts-confirm-payment-button" type="button"
+                            class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">Confirmar
+                            Recebimento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-customer-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Adicionar Novo Cliente</h3>
+                <button onclick="closeAddCustomerModal()"
+                    class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+            <form id="modal-add-customer-form" class="p-6 space-y-4">
+                <input type="text" id="modal-new-customer-name" placeholder="Nome Completo" required
+                    class="w-full p-2 border rounded">
+                <input type="text" id="modal-new-customer-phone" placeholder="Telefone (opcional)"
+                    class="w-full p-2 border rounded">
+                <div class="bg-gray-100 p-4 flex justify-end">
+                    <button onclick="closeAddCustomerModal()" type="button"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                    <button type="submit"
+                        class="w-full bg-purple-600 text-white font-bold py-2 rounded-lg hover:bg-purple-700">Adicionar
+                        Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="manual-debt-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-900">Adicionar Dívida Manual</h3>
+                <button onclick="closeManualDebtModal()"
+                    class="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+            <form id="manual-debt-form" class="p-6 space-y-4">
+                <input type="hidden" id="manual-debt-customer-id">
+                <p>Cliente: <span id="manual-debt-customer-name" class="font-semibold"></span></p>
+                <div>
+                    <label for="manual-debt-amount" class="block text-sm font-medium text-gray-700">Valor da Dívida
+                        (R$)</label>
+                    <input type="tel" id="manual-debt-amount" required class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="manual-debt-description" class="block text-sm font-medium text-gray-700">Descrição
+                        (Opcional)</label>
+                    <input type="text" id="manual-debt-description" placeholder="Ex: Dívida antiga, Vale"
+                        class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div class="bg-gray-100 p-4 flex justify-end gap-2">
+                    <button type="button" onclick="closeManualDebtModal()"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                    <button type="submit"
+                        class="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Adicionar
+                        Dívida</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 
     <!-- Receipt Modal -->
-    <div id="receipt-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-        <div id="receipt-content" class="bg-white rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
+    <div id="receipt-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div id="receipt-content"
+            class="bg-white rounded-lg shadow-xl w-full max-w-sm transform transition-all scale-95">
             <div class="p-6 text-center">
                 <h3 id="receipt-store-name" class="text-2xl font-bold text-gray-900">Top de Linha</h3>
                 <p id="receipt-store-address" class="text-sm text-gray-500">Rua Fictícia, 123 - Bairro Imaginário</p>
                 <p id="receipt-store-cnpj" class="text-sm text-gray-500">CNPJ: 12.345.678/0001-99</p>
                 <div class="my-4 border-t border-dashed"></div>
                 <p class="text-left text-xs text-gray-600">Data: <span id="receipt-date"></span></p>
-                <p class="text-left text-xs text-gray-600">Venda: #<span id="receipt-sale-id"></span> | Turno: #<span id="receipt-shift-id"></span></p>
+                <p class="text-left text-xs text-gray-600">Venda: #<span id="receipt-sale-id"></span> | Turno: #<span
+                        id="receipt-shift-id"></span></p>
                 <p class="text-left text-xs text-gray-600">Via <span id="receipt-customer"></span></p>
                 <div class="my-4 border-t border-dashed"></div>
                 <div id="receipt-items" class="text-left text-sm space-y-1">
@@ -556,17 +693,21 @@
                 <p id="receipt-warning-message" class="font-semibold"></p>
             </div>
             <div class="bg-gray-100 p-4 flex justify-between items-center non-printable">
-                <button id="open-drawer-button" type="button" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Abrir Gaveta</button>
+                <button id="open-drawer-button" type="button"
+                    class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Abrir Gaveta</button>
                 <div class="space-x-2">
-                    <button id="close-receipt-button" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
-                    <button id="print-receipt-button" type="button" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">Imprimir</button>
+                    <button id="close-receipt-button" type="button"
+                        class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Fechar</button>
+                    <button id="print-receipt-button" type="button"
+                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">Imprimir</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal Diversos -->
-    <div id="diversos-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div id="diversos-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div class="p-6 border-b flex justify-between items-center">
                 <h3 class="text-2xl font-bold text-gray-900">Itens Diversos</h3>
@@ -580,27 +721,32 @@
                 <button data-item="Outros" class="diversos-item-btn p-4 rounded-md border-2">Outros</button>
             </div>
             <div class="bg-gray-100 p-4 flex justify-end">
-                <button onclick="closeDiversosModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                <button onclick="closeDiversosModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
             </div>
         </div>
     </div>
 
     <!-- Barcode Scanner Modal -->
-    <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div id="scanner-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-xl font-bold text-gray-900">Escanear Código de Barras</h3>
-                <button onclick="closeScannerModal()" class="text-gray-400 hover:text-gray-600 font-bold py-1 px-2 rounded">&times;</button>
+                <button onclick="closeScannerModal()"
+                    class="text-gray-400 hover:text-gray-600 font-bold py-1 px-2 rounded">&times;</button>
             </div>
             <div class="p-4">
                 <div id="reader" width="100%"></div>
             </div>
             <div class="bg-gray-100 p-4 flex justify-end">
-                <button onclick="closeScannerModal()" type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
+                <button onclick="closeScannerModal()" type="button"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md">Cancelar</button>
             </div>
         </div>
     </div>
-    
+
     <script type="module" src="script.js"></script>
-      </body>
+</body>
+
 </html>
